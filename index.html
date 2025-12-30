@@ -19,7 +19,7 @@
         .wrapper {
             position:relative; z-index:2;
             height:100%; padding:20px;
-            display:flex; flex-direction:column; gap:28px;
+            display:flex; flex-direction:column; gap:32px;
             align-items:center; justify-content:flex-start;
             overflow-y:auto;
         }
@@ -32,30 +32,7 @@
             display:flex; flex-direction:column; gap:14px;
             align-items:center; text-align:center;
         }
-        input,button{
-            background:transparent;
-            border:none; border-bottom:1px solid rgba(100,200,255,0.4);
-            color:#88ddff; padding:6px 0;
-            font-size:13px; letter-spacing:1px;
-            outline:none; transition:.3s;
-        }
-        input::placeholder { color:rgba(100,200,255,0.5); }
-        button{cursor:pointer; opacity:0.8;}
-        button:hover{opacity:1; text-shadow:0 0 6px rgba(100,200,255,0.5);}
         p {font-size:13px; letter-spacing:1.4px; opacity:0.7; line-height:1.5;}
-        #cycle-frame{
-            display:flex; flex-wrap:wrap; justify-content:center; gap:10px;
-        }
-        .cycle-label{
-            width:36px; height:36px;
-            display:flex; align-items:center; justify-content:center;
-            font-size:12px; letter-spacing:1px;
-            opacity:0.6; transition:.3s;
-        }
-        .highlighted{
-            opacity:1; color:#ffffff;
-            text-shadow:0 0 8px rgba(100,200,255,0.8);
-        }
         .kp-bar {
             width:300px; height:4px;
             background:rgba(100,200,255,0.15);
@@ -84,16 +61,6 @@
 <canvas id="stars"></canvas>
 <div class="wrapper">
     <h1>IBONARIUM COSMO LAB</h1>
-
-    <div class="block">
-        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
-            <input type="text" id="date-entry" placeholder="YYYY-MM-DD">
-            <button onclick="showIbonarium()">ДЕНЬ</button>
-        </div>
-        <p id="result-label" style="white-space:pre-line;opacity:0.8;"></p>
-
-        <div id="cycle-frame"></div>
-    </div>
 
     <div class="block">
         <p class="kp-text" id="kp-text">KP: —</p>
@@ -141,32 +108,6 @@
         requestAnimationFrame(drawStars);
     }
     drawStars();
-
-    /* IBONARIUM DATE */
-    const ibonDays=["Пн","Вт","Ср","Чт","Пт","Сб","Нд","Нд1","Нд2","Нд3","Нд4","Нд5"];
-    const startDate=new Date(1,0,1);
-    function realIbonariumDate(d=new Date()){
-        const delta=Math.floor((d-startDate)/(86400000));
-        return {delta,day:ibonDays[delta%12],idx:delta%12};
-    }
-    const cycleFrame=document.getElementById('cycle-frame');
-    ibonDays.forEach(day=>{
-        const el=document.createElement('div');
-        el.className='cycle-label'; el.textContent=day;
-        cycleFrame.appendChild(el);
-    });
-    function highlight(idx){
-        Array.from(cycleFrame.children).forEach((e,i)=>e.classList.toggle('highlighted',i===idx));
-    }
-    function showIbonarium(){
-        const val=document.getElementById('date-entry').value.trim();
-        const d=val?new Date(val):new Date();
-        if(isNaN(d)){document.getElementById('result-label').textContent='ПОМИЛКА ФОРМАТУ'; return;}
-        const {delta,day,idx}=realIbonariumDate(d);
-        document.getElementById('result-label').textContent=`ДАТА: ${d.toISOString().slice(0,10)}\nДЕНЬ: ${day}\nДНІВ ВІД 1 Н.Е.: ${delta}`;
-        highlight(idx);
-    }
-    highlight(realIbonariumDate().idx);
 
     /* SPACE DATA */
     const KP_URL="https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
