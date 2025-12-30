@@ -222,13 +222,12 @@ const moonCanvas = document.getElementById('moonCanvas');
 const ctx = moonCanvas.getContext('2d');
 moonCanvas.width = W;
 moonCanvas.height = H;
-let scale = 0.5; // Трохи більший стартовий масштаб для Місяця
+let scale = 0.35; // Зменшено стартовий розмір (було 0.5 → тепер 0.35, як у Сонця ~0.4)
 let img = new Image();
 const photoTimeEl = document.getElementById("photoTime");
-const fallbackURL = "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg"; // Фолбек: повний Місяць
+const fallbackURL = "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg";
 
 async function loadMoon() {
-  // Використовуємо TheSkyLive для актуального вигляду фази Місяця (рендериться динамічно)
   const url = "https://theskylive.com/assets/moon/moon_phase.jpg?" + Date.now();
   
   return new Promise((resolve) => {
@@ -261,40 +260,61 @@ function drawMoon() {
 
 /* ================= КЕРУВАННЯ МАСШТАБОМ ================= */
 document.getElementById("minusBtn").addEventListener("click", () => {
-  scale = Math.max(0.4, scale - 0.15);
+  scale = Math.max(0.3, scale - 0.1); // Мінімум трохи нижче, крок зменшено для точності
   drawMoon();
 });
 document.getElementById("plusBtn").addEventListener("click", () => {
-  scale = Math.min(2.5, scale + 0.15);
+  scale = Math.min(2.0, scale + 0.1);
   drawMoon();
 });
 moonCanvas.addEventListener("wheel", e => {
   e.preventDefault();
-  if (e.deltaY < 0) scale = Math.min(2.5, scale + 0.15);
-  if (e.deltaY > 0) scale = Math.max(0.4, scale - 0.15);
+  if (e.deltaY < 0) scale = Math.min(2.0, scale + 0.1);
+  if (e.deltaY > 0) scale = Math.max(0.3, scale - 0.1);
   drawMoon();
 });
 
 /* ================= ДАНІ ФАЗИ МІСЯЦЯ ================= */
-// Використовуємо безкоштовний API з https://api.astronomyapi.com (потрібна реєстрація для ключа, тут приклад)
-// Альтернатива: простий розрахунок або статичний API. Тут використовуємо farmsense (якщо працює) або placeholder.
-const MOON_API_URL = "https://api.farmsense.net/v1/moonphases/?d=" + Math.floor(Date.now() / 1000);
-
+// Надійніше джерело — US Naval Observatory API (без ключа, простий JSON)
 async function getMoonData() {
   try {
-    const r = await fetch(MOON_API_URL);
-    const d = await r.json();
-    if (d && d.length > 0) {
-      const data = d[0];
+    const today = new Date().toISOString().slice(0,10);
+    const response = await fetch(`https://api.usno.navy.mil/moon/phase?date=${today}`);
+    const data = await response.json();
+    if (data && data.phasedata && data.phasedata.length > 0) {
+      const phaseData = data.phasedata.find(p => p.phase); // Поточна або найближча
+      const illum = data.illum || data.phasedata[0].illum || 0;
       return {
-        phase: data.Phase || "Невідома",
-        illumination: data.Illumination * 100 || 0,
-        age: data.Age || 0,
-        distance: data.Distance || 384400 // середня відстань як фолбек
+        phase: phaseData ? phaseData.phase : "Невідома",
+        illumination: illum,
+        age: data.moonage || 0,
+        distance: data.moondistance || 384400
       };
     }
   } catch (e) { console.error(e); }
-  return null;
+
+  // Фолбек — простий розрахунок (не точний, але працює без API)
+  const d = new Date();
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth() + 1;
+  const day = d.getUTCDate();
+  let age = (year - 1900) * 12.3685 + (month - 1);
+  age += day / 30.436875;
+  age = (age - Math.floor(age)) * 29.53058867;
+  const illumination = 50 * (1 - Math.cos(age * Math.PI / 14.765294335));
+  let phaseName = "Новий Місяць";
+  if (age > 1 && age < 13.5) phaseName = "Зростаючий Серп";
+  else if (age < 16) phaseName = "Перша Чверть";
+  else if (age < 28) phaseName = "Зростаючий Місяць";
+  else if (age < 29.5) phaseName = "Повний Місяць";
+  else phaseName = "Спадаючий Місяць";
+
+  return {
+    phase: phaseName,
+    illumination: illumination,
+    age: age,
+    distance: 384400 // середня
+  };
 }
 
 function updateMoonData(data) {
@@ -326,7 +346,7 @@ async function updateMoonPhaseData() {
 }
 
 /* ================= АВТООНОВЛЕННЯ ================= */
-setInterval(() => loadMoon(), 3600000); // Оновлення зображення щогодини (фаза змінюється повільно)
+setInterval(() => loadMoon(), 3600000); // Зображення щогодини
 setInterval(updateMoonPhaseData, 3600000); // Дані щогодини
 
 /* ================= РЕСАЙЗ ================= */
