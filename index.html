@@ -74,6 +74,11 @@ html, body {
   letter-spacing: 1.2px;
   opacity: 0.9;
 }
+.moon-data .combined-line {
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  opacity: 0.9;
+}
 /* ================= CONTROLS ================= */
 .controls {
   display: flex;
@@ -141,7 +146,7 @@ button.active {
   .footer-text { font-size: 9px; }
   .wrapper { bottom: 8px; gap: 8px; }
   .moon-data .phase-bar { width: 200px; }
-  .moon-data .title, .moon-data .data-line {
+  .moon-data .title, .moon-data .data-line, .moon-data .combined-line {
     font-size: 10px;
   }
 }
@@ -162,9 +167,8 @@ button.active {
       </div>
     </div>
    
-    <div class="data-line" id="illumination-label">ОСВІТЛЕНІСТЬ: — %</div>
-    <div class="data-line" id="age-label">ВІК: — ДНІВ</div>
-    <div class="data-line" id="distance-label">ВІДСТАНЬ: — КМ</div>
+    <!-- Тепер усі три параметри в одному рядку -->
+    <div class="combined-line" id="combined-label">ОСВІТЛЕНІСТЬ: — % │ ВІК: — ДНІВ │ ВІДСТАНЬ: — КМ</div>
   </div>
   <!-- Кнопки масштабування -->
   <div class="controls">
@@ -222,7 +226,7 @@ const moonCanvas = document.getElementById('moonCanvas');
 const ctx = moonCanvas.getContext('2d');
 moonCanvas.width = W;
 moonCanvas.height = H;
-let scale = 0.35; // Зменшено стартовий розмір (було 0.5 → тепер 0.35, як у Сонця ~0.4)
+let scale = 0.3; // Стартовий розмір на мінімальному рівні (дуже маленький)
 let img = new Image();
 const photoTimeEl = document.getElementById("photoTime");
 const fallbackURL = "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg";
@@ -260,32 +264,31 @@ function drawMoon() {
 
 /* ================= КЕРУВАННЯ МАСШТАБОМ ================= */
 document.getElementById("minusBtn").addEventListener("click", () => {
-  scale = Math.max(0.3, scale - 0.1); // Мінімум трохи нижче, крок зменшено для точності
+  scale = Math.max(0.3, scale - 0.1);
   drawMoon();
 });
 document.getElementById("plusBtn").addEventListener("click", () => {
-  scale = Math.min(2.0, scale + 0.1);
+  scale = Math.min(2.5, scale + 0.1);
   drawMoon();
 });
 moonCanvas.addEventListener("wheel", e => {
   e.preventDefault();
-  if (e.deltaY < 0) scale = Math.min(2.0, scale + 0.1);
+  if (e.deltaY < 0) scale = Math.min(2.5, scale + 0.1);
   if (e.deltaY > 0) scale = Math.max(0.3, scale - 0.1);
   drawMoon();
 });
 
 /* ================= ДАНІ ФАЗИ МІСЯЦЯ ================= */
-// Надійніше джерело — US Naval Observatory API (без ключа, простий JSON)
 async function getMoonData() {
   try {
     const today = new Date().toISOString().slice(0,10);
     const response = await fetch(`https://api.usno.navy.mil/moon/phase?date=${today}`);
     const data = await response.json();
     if (data && data.phasedata && data.phasedata.length > 0) {
-      const phaseData = data.phasedata.find(p => p.phase); // Поточна або найближча
-      const illum = data.illum || data.phasedata[0].illum || 0;
+      const phaseData = data.phasedata[0];
+      const illum = data.illum || 0;
       return {
-        phase: phaseData ? phaseData.phase : "Невідома",
+        phase: phaseData.phase || "Невідома",
         illumination: illum,
         age: data.moonage || 0,
         distance: data.moondistance || 384400
@@ -293,7 +296,7 @@ async function getMoonData() {
     }
   } catch (e) { console.error(e); }
 
-  // Фолбек — простий розрахунок (не точний, але працює без API)
+  // Фолбек — математичний розрахунок
   const d = new Date();
   const year = d.getUTCFullYear();
   const month = d.getUTCMonth() + 1;
@@ -313,31 +316,25 @@ async function getMoonData() {
     phase: phaseName,
     illumination: illumination,
     age: age,
-    distance: 384400 // середня
+    distance: 384400
   };
 }
 
 function updateMoonData(data) {
   const phaseText = document.getElementById('phase-text');
   const phaseFill = document.getElementById('phase-fill');
-  const illumLabel = document.getElementById('illumination-label');
-  const ageLabel = document.getElementById('age-label');
-  const distLabel = document.getElementById('distance-label');
+  const combinedLabel = document.getElementById('combined-label');
 
   if (!data) {
     phaseText.textContent = 'ФАЗА: —';
     phaseFill.style.width = '0%';
-    illumLabel.textContent = 'ОСВІТЛЕНІСТЬ: — %';
-    ageLabel.textContent = 'ВІК: — ДНІВ';
-    distLabel.textContent = 'ВІДСТАНЬ: — КМ';
+    combinedLabel.textContent = 'ОСВІТЛЕНІСТЬ: — % │ ВІК: — ДНІВ │ ВІДСТАНЬ: — КМ';
     return;
   }
 
   phaseText.textContent = `ФАЗА: ${data.phase.toUpperCase()}`;
   phaseFill.style.width = `${data.illumination}%`;
-  illumLabel.textContent = `ОСВІТЛЕНІСТЬ: ${data.illumination.toFixed(1)} %`;
-  ageLabel.textContent = `ВІК: ${data.age.toFixed(1)} ДНІВ`;
-  distLabel.textContent = `ВІДСТАНЬ: ${Math.round(data.distance)} КМ`;
+  combinedLabel.textContent = `ОСВІТЛЕНІСТЬ: ${data.illumination.toFixed(1)} % │ ВІК: ${data.age.toFixed(1)} ДНІВ │ ВІДСТАНЬ: ${Math.round(data.distance)} КМ`;
 }
 
 async function updateMoonPhaseData() {
