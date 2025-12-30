@@ -64,7 +64,7 @@
             box-shadow:0 0 10px rgba(77,210,255,.8);
         }
         .chart{
-            width:100%; max-width:460px; height:180px;
+            width:100%; max-width:460px; height:200px;
         }
         @media(max-width:900px){
             .container{flex-direction:column;}
@@ -72,6 +72,7 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
 </head>
 <body>
 <canvas id="stars"></canvas>
@@ -102,7 +103,7 @@
             <h2>IBONARIUM TIME</h2>
             <canvas id="clock-canvas" width="300" height="340"></canvas>
 
-            <h3>GOES X-RAY</h3>
+            <h3>X-RAY ДОБА</h3>
             <canvas class="chart" id="xray-chart"></canvas>
 
             <h3>KP INDEX</h3>
@@ -175,7 +176,7 @@
         for(let i=d.length-1;i>=0;i--)if(d[i].kp_index!==null)return parseFloat(d[i].kp_index);
     }catch{}return null;}
     async function getSW(){try{const r=await fetch(SW_URL);const d=await r.json();
-        for(let i=d.length-1;i>=0;i--){const row=d[i];if(row.length>=3&&row[1]&&row[2])return[row[1],row[2]];}
+        for(let i=d.length-1;i>=0;i--){const row=d[i];if(row.length>=3&&row[1]&&row[2])return[parseFloat(row[1]),parseFloat(row[2])];}
     }catch{}return[null,null];}
     async function getBz(){try{const r=await fetch(BZ_URL);const d=await r.json();
         for(let i=d.length-1;i>=0;i--){const row=d[i];if(row.length>=5&&row[4])return parseFloat(row[4]);}
@@ -188,10 +189,11 @@
     async function getGoesFull(){try{const r=await fetch(GOES_URL);const d=await r.json();
         const s=[],l=[];
         d.forEach(o=>{const t=new Date(o.time_tag);
-            if(o.energy==="0.1-0.8nm")s.push([t,parseFloat(o.flux)]);
-            else if(o.energy==="0.05-0.4nm")l.push([t,parseFloat(o.flux)]);
+            if(o.energy==="0.1-0.8nm")s.push({t, f:parseFloat(o.flux)});
+            else if(o.energy==="0.05-0.4nm")l.push({t, f:parseFloat(o.flux)});
         });
-        return {ts:s.map(p=>p[0]),fs:s.map(p=>p[1]),tl:l.map(p=>p[0]),fl:l.map(p=>p[1])};
+        s.sort((a,b)=>a.t-b.t); l.sort((a,b)=>a.t-b.t);
+        return {ts:s.map(p=>p.t),fs:s.map(p=>p.f),tl:l.map(p=>p.t),fl:l.map(p=>p.f)};
     }catch{}return {ts:[],fs:[],tl:[],fl:[]};}
 
     const kpC=document.getElementById('kp-canvas'),kpX=kpC.getContext('2d');
@@ -299,35 +301,49 @@
     }
 
     /* CHARTS */
+    Chart.register(ChartAnnotation);
     let xrayC,kpCht,goesC;
     function initCharts(){
-        const opt={plugins:{legend:{labels:{color:'#9fe7ff'}},title:{color:'#4dd2ff',display:true}},
-            scales:{x:{ticks:{color:'#9fe7ff'},grid:{color:'#222'}},y:{ticks:{color:'#9fe7ff'},grid:{color:'#222'}}}};
+        const opt={plugins:{legend:{labels:{color:'#9fe7ff'}},title:{color:'#4dd2ff',display:true,font:{size:12}}},
+            scales:{x:{type:'time',time:{displayFormats:{hour:'HH:mm'}},ticks:{color:'#9fe7ff'},grid:{color:'#222'}},
+                    y:{ticks:{color:'#9fe7ff'},grid:{color:'#222'}}}};
+
         goesC=new Chart(document.getElementById('goes-chart'),{
             type:'line',data:{datasets:[{label:'Flux',borderColor:'#4dd2ff',data:[]}]},
-            options:{...opt,plugins:{...opt.plugins,title:{text:'GOES FLUX'}}}});
+            options:{...opt,plugins:{...opt.plugins,title:{text:'GOES FLUX'}},scales:{...opt.scales,y:{type:'logarithmic',min:1e-9,max:1e-4}}}});
+
         kpCht=new Chart(document.getElementById('kp-chart'),{
             type:'line',data:{datasets:[{label:'Kp',borderColor:'#ff3333',data:[]}]},
-            options:{...opt,scales:{...opt.scales,y:{min:0,max:9}},plugins:{...opt.plugins,title:{text:'KP INDEX'}}}});
+            options:{...opt,plugins:{...opt.plugins,title:{text:'KP INDEX'}},scales:{...opt.scales,y:{min:0,max:9}}}});
+
         xrayC=new Chart(document.getElementById('xray-chart'),{
             type:'line',data:{datasets:[
                 {label:'0.1-0.8nm',borderColor:'#4dd2ff',data:[]},
                 {label:'0.05-0.4nm',borderColor:'#ff00ff',data:[]}
             ]},
-            options:{...opt,scales:{...opt.scales,y:{type:'logarithmic',min:1e-8,max:1e-3}},
-                plugins:{...opt.plugins,title:{text:'X-RAY ДОБА'}}}});
+            options:{...opt,plugins:{...opt.plugins,title:{text:'X-RAY ДОБА'}},
+                scales:{...opt.scales,y:{type:'logarithmic',min:1e-9,max:1e-4}},
+                annotation:{annotations:{
+                    a:{type:'line',yMin:1e-8,yMax:1e-8,borderColor:'#aaaaaa',borderWidth:1,label:{content:'A',enabled:true,position:'start'}},
+                    b:{type:'line',yMin:1e-7,yMax:1e-7,borderColor:'#88ff88',borderWidth:1,label:{content:'B',enabled:true,position:'start'}},
+                    c:{type:'line',yMin:1e-6,yMax:1e-6,borderColor:'#ffff00',borderWidth:1,label:{content:'C',enabled:true,position:'start'}},
+                    m:{type:'line',yMin:1e-5,yMax:1e-5,borderColor:'#ff8800',borderWidth:1,label:{content:'M',enabled:true,position:'start'}},
+                    x:{type:'line',yMin:1e-4,yMax:1e-4,borderColor:'#ff0000',borderWidth:1,label:{content:'X',enabled:true,position:'start'}}
+                }}}});
     }
     async function updateCharts(){
         try{const r=await fetch(GOES_URL);const d=await r.json();
             const t=d.map(o=>new Date(o.time_tag));
-            const v=d.map(o=>parseFloat(o.flux));
-            goesC.data.labels=t; goesC.data.datasets[0].data=v.map((y,i)=>({x:t[i],y}));
+            const v=d.map(o=>parseFloat(o.flux)||null);
+            goesC.data.labels=t;
+            goesC.data.datasets[0].data=v.map((y,i)=>({x:t[i],y}));
             goesC.update();
         }catch{}
         try{const r=await fetch(KP_URL);const d=(await r.json()).slice(-40);
             const t=d.map(o=>new Date(o.time_tag));
             const v=d.map(o=>parseFloat(o.kp_index));
-            kpCht.data.labels=t; kpCht.data.datasets[0].data=v.map((y,i)=>({x:t[i],y}));
+            kpCht.data.labels=t;
+            kpCht.data.datasets[0].data=v.map((y,i)=>({x:t[i],y}));
             kpCht.update();
         }catch{}
         sunFrames=await getSun();
@@ -336,8 +352,8 @@
     async function updateXray(){
         const {ts,fs,tl,fl}=await getGoesFull();
         if(ts.length){
-            xrayC.data.datasets[0].data=ts.map((x,i)=>({x,y:fs[i]}));
-            xrayC.data.datasets[1].data=tl.map((x,i)=>({x,y:fl[i]}));
+            xrayC.data.datasets[0].data=ts.map((t,i)=>({x:t,y:fs[i]||null}));
+            xrayC.data.datasets[1].data=tl.map((t,i)=>({x:t,y:fl[i]||null}));
             xrayC.update();
         }
         setTimeout(updateXray,300000);
