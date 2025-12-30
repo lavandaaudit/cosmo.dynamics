@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ibonarium Cosmo Dynamics Lab LIVE</title>
+    <style>
+        /* Кіберпанк стиль: темний фон, неонові акценти, футуристичні шрифти */
+        body {
+            background-color: #111111;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            max-width: 1800px;
+            width: 100%;
+            padding: 20px;
+        }
+        .left, .right {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #ff8800; /* Неоновий помаранчевий */
+            text-shadow: 0 0 10px #ff8800;
+        }
+        input, button {
+            background-color: #333333;
+            color: #ffffff;
+            border: 1px solid #ff8800;
+            padding: 10px;
+            font-size: 18px;
+        }
+        button:hover {
+            background-color: #ff8800;
+            color: #000000;
+        }
+        canvas {
+            border: 1px solid #333333;
+            background-color: #0f0f0f;
+            box-shadow: 0 0 20px rgba(255, 136, 0, 0.5);
+        }
+        #cycle-frame {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .cycle-label {
+            width: 50px;
+            height: 50px;
+            background-color: #333333;
+            color: #ffffff;
+            text-align: center;
+            line-height: 50px;
+            margin: 5px;
+            border: 2px solid #ff8800;
+            border-radius: 5px;
+        }
+        .highlighted {
+            background-color: #ff8800;
+            color: #000000;
+        }
+        #solar-wind-label, #bz-label, #bz-status-label {
+            font-size: 18px;
+            text-shadow: 0 0 5px #00ff88;
+        }
+        #video-player {
+            width: 100%;
+            max-width: 780px;
+            height: auto;
+            background-color: #000000;
+            box-shadow: 0 0 20px #ff00ff;
+        }
+        /* Responsive design */
+        @media (max-width: 1200px) {
+            .container {
+                flex-direction: column;
+            }
+            .left, .right {
+                width: 100%;
+            }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Ліва частина -->
+        <div class="left">
+            <h1>Ibonarium Cosmo Dynamics Lab LIVE</h1>
+            <input type="text" id="date-entry" placeholder="YYYY-MM-DD">
+            <button onclick="showIbonarium()">Показати день</button>
+            <p id="result-label"></p>
+            <div id="cycle-frame"></div>
+            <h3>Kp-індекс:</h3>
+            <canvas id="kp-canvas" width="400" height="40"></canvas>
+            <h3>Фаза Місяця:</h3>
+            <canvas id="moon-canvas" width="120" height="140"></canvas>
+            <h3>Сонячний вітер:</h3>
+            <p id="solar-wind-label">Швидкість: — km/s │ Щільність: — p/cm³</p>
+            <p id="bz-label">Bz: — нТ</p>
+            <p id="bz-status-label">Очікування даних...</p>
+            <h3>Сонце LIVE</h3>
+            <img id="sun-img" width="400" height="400" alt="Sun Image">
+            <canvas id="goes-chart" width="900" height="400"></canvas>
+            <canvas id="kp-chart" width="900" height="400"></canvas>
+        </div>
+        <!-- Права частина -->
+        <div class="right">
+            <h2>IBONARIUM TIME</h2>
+            <canvas id="clock-canvas" width="420" height="480"></canvas>
+            <h3>GOES X-ray (остання доба)</h3>
+            <canvas id="xray-chart" width="780" height="480"></canvas>
+            <h3>IBONARIUM</h3>
+            <video id="video-player" controls autoplay loop muted>
+                <source src="https://example.com/placeholder-video.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <p>Примітка: Для відео використовуйте URL з репозиторію або зовнішнє посилання. Локальна папка не підтримується на GitHub Pages.</p>
+        </div>
+    </div>
+
+    <script>
+        // Ibonarium Date System
+        const ibonDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд", "Нд1", "Нд2", "Нд3", "Нд4", "Нд5"];
+        const startDate = new Date(1, 0, 1); // January 1, 1 AD
+
+        function realIbonariumDate(checkDate = new Date()) {
+            const deltaDays = Math.floor((checkDate - startDate) / (1000 * 60 * 60 * 24));
+            const dayInCycle = ibonDays[deltaDays % 12];
+            return { deltaDays, dayInCycle, index: deltaDays % 12 };
+        }
+
+        // Cycle labels
+        const cycleFrame = document.getElementById('cycle-frame');
+        ibonDays.forEach(day => {
+            const lbl = document.createElement('div');
+            lbl.className = 'cycle-label';
+            lbl.textContent = day;
+            cycleFrame.appendChild(lbl);
+        });
+        const cycleLabels = cycleFrame.children;
+
+        function highlightCycle(idx) {
+            Array.from(cycleLabels).forEach((lbl, i) => {
+                lbl.classList.toggle('highlighted', i === idx);
+            });
+        }
+
+        function showIbonarium() {
+            const txt = document.getElementById('date-entry').value.trim();
+            let chk;
+            try {
+                chk = txt ? new Date(txt) : new Date();
+                const { deltaDays, dayInCycle, index } = realIbonariumDate(chk);
+                document.getElementById('result-label').textContent = `Дата: ${chk.toISOString().split('T')[0]}\nДень: ${dayInCycle}\nДнів від 1 н.е.: ${deltaDays}`;
+                highlightCycle(index);
+            } catch {
+                document.getElementById('result-label').textContent = 'Помилка: введіть дату у форматі YYYY-MM-DD';
+            }
+        }
+
+        // Initial highlight
+        const todayIdx = realIbonariumDate().index;
+        highlightCycle(todayIdx);
+
+        // Space Weather Fetch
+        const KP_URL = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
+        const SOLAR_WIND_URL = "https://services.swpc.noaa.gov/products/solar-wind/plasma-6-hour.json";
+        const BZ_URL = "https://services.swpc.noaa.gov/products/solar-wind/mag-6-hour.json";
+        const GOES_XRAY_URL = "https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json";
+        const HELIO_API_BASE = "https://api.helioviewer.org/v2";
+        const HELIO_SOURCE_ID = 10;
+
+        let currentKp = null;
+        let frames = [];
+        let frameIndex = 0;
+
+        async function fetchKpIndex() {
+            try {
+                const resp = await fetch(KP_URL);
+                const data = await resp.json();
+                for (let i = data.length - 1; i >= 0; i--) {
+                    const kp = data[i].kp_index;
+                    if (kp !== null) return parseFloat(kp);
+                }
+            } catch (e) {
+                console.error("KP fetch error:", e);
+            }
+            return null;
+        }
+
+        async function fetchSolarWind() {
+            try {
+                const resp = await fetch(SOLAR_WIND_URL);
+                const data = await resp.json();
+                for (let i = data.length - 1; i >= 0; i--) {
+                    const row = data[i];
+                    if (row.length >= 3 && row[1] && row[2]) {
+                        return [parseFloat(row[1]), parseFloat(row[2])];
+                    }
+                }
+            } catch {}
+            return [null, null];
+        }
+
+        async function fetchBz() {
+            try {
+                const resp = await fetch(BZ_URL);
+                const data = await resp.json();
+                for (let i = data.length - 1; i >= 0; i--) {
+                    const row = data[i];
+                    if (row.length >= 5 && row[4]) {
+                        return parseFloat(row[4]);
+                    }
+                }
+            } catch {}
+            return null;
+        }
+
+        function getMoonPhase() {
+            const SYNODIC_MONTH = 29.53058867;
+            const EPOCH = new Date(Date.UTC(2000, 0, 6, 18, 14));
+            const now = new Date();
+            const diff = (now - EPOCH) / (1000 * 60 * 60 * 24);
+            const phase = (diff % SYNODIC_MONTH) / SYNODIC_MONTH;
+            return phase;
+        }
+
+        async function getGoesXrayFull() {
+            try {
+                const resp = await fetch(GOES_XRAY_URL);
+                const data = await resp.json();
+                const short = [], long_ = [];
+                data.forEach(d => {
+                    const t = new Date(d.time_tag);
+                    if (d.energy === "0.1-0.8nm") short.push([t, parseFloat(d.flux)]);
+                    else if (d.energy === "0.05-0.4nm") long_.push([t, parseFloat(d.flux)]);
+                });
+                short.sort((a, b) => a[0] - b[0]);
+                long_.sort((a, b) => a[0] - b[0]);
+                return {
+                    ts: short.map(x => x[0]),
+                    fs: short.map(x => x[1]),
+                    tl: long_.map(x => x[0]),
+                    fl: long_.map(x => x[1])
+                };
+            } catch {}
+            return { ts: [], fs: [], tl: [], fl: [] };
+        }
+
+        // Draw KP index bar
+        const kpCanvas = document.getElementById('kp-canvas');
+        const kpCtx = kpCanvas.getContext('2d');
+
+        function drawKpIndex() {
+            kpCtx.clearRect(0, 0, kpCanvas.width, kpCanvas.height);
+            if (currentKp === null) {
+                kpCtx.fillStyle = 'white';
+                kpCtx.font = '16px Arial';
+                kpCtx.fillText('Kp: —', 200, 20);
+                return;
+            }
+            const barWidth = 400 / 10;
+            for (let i = 0; i < 10; i++) {
+                kpCtx.fillStyle = i <= currentKp ? '#00ff00' : '#555555';
+                kpCtx.fillRect(i * barWidth, 0, barWidth, 40);
+            }
+            kpCtx.fillStyle = 'white';
+            kpCtx.font = '16px Arial';
+            kpCtx.textAlign = 'right';
+            kpCtx.fillText(currentKp.toFixed(2), 380, 20);
+        }
+
+        // Draw Moon Phase
+        const moonCanvas = document.getElementById('moon-canvas');
+        const moonCtx = moonCanvas.getContext('2d');
+
+        function drawMoonPhase() {
+            moonCtx.clearRect(0, 0, moonCanvas.width, moonCanvas.height);
+            const phase = getMoonPhase();
+            moonCtx.fillStyle = 'white';
+            moonCtx.beginPath();
+            moonCtx.arc(60, 60, 50, 0, 2 * Math.PI);
+            moonCtx.fill();
+            moonCtx.fillStyle = '#111111';
+            moonCtx.beginPath();
+            if (phase < 0.5) {
+                moonCtx.arc(60, 60, 50, Math.PI / 2, 3 * Math.PI / 2, true);
+            } else {
+                moonCtx.arc(60, 60, 50, 3 * Math.PI / 2, Math.PI / 2, true);
+            }
+            moonCtx.fill();
+            moonCtx.fillStyle = 'white';
+            moonCtx.font = '16px Arial';
+            moonCtx.textAlign = 'center';
+            moonCtx.fillText(`${(phase * 100).toFixed(0)}%`, 60, 125);
+        }
+
+        // Update Space Data
+        async function updateSpaceData() {
+            const kp = await fetchKpIndex();
+            if (kp !== null) currentKp = kp;
+            drawKpIndex();
+            const [speed, density] = await fetchSolarWind();
+            if (speed && density) {
+                const color = speed > 600 ? '#00ff88' : 'white';
+                document.getElementById('solar-wind-label').style.color = color;
+                document.getElementById('solar-wind-label').textContent = `Швидкість: ${speed.toFixed(0)} km/s │ Щільність: ${density.toFixed(1)} p/cm³`;
+            }
+            const bz = await fetchBz();
+            if (bz !== null) {
+                let color, status;
+                if (bz < -12) { color = '#ff0000'; status = 'ЕКСТРЕМАЛЬНА БУРЯ — АВРОРА В УКРАЇНІ!'; }
+                else if (bz < -8) { color = '#ff3333'; status = 'СИЛЬНА БУРЯ — висока ймовірність аврори'; }
+                else if (bz < -5) { color = '#ff8833'; status = 'ПОПЕРЕДЖЕННЯ — можлива буря'; }
+                else if (bz < 0) { color = '#ffaa33'; status = 'Слабкий південний Bz — стежимо'; }
+                else if (bz > 8) { color = '#00ff00'; status = 'АБСОЛЮТНИЙ СПОКІЙ — магнітосфера закрита'; }
+                else if (bz > 3) { color = '#88ff88'; status = 'СПОКІЙНО — хороший захист'; }
+                else { color = '#ffff66'; status = 'НЕЙТРАЛЬНО — без подій'; }
+                document.getElementById('bz-label').textContent = `Bz: ${bz.toFixed(1)} нТ`;
+                document.getElementById('bz-label').style.color = color;
+                document.getElementById('bz-status-label').textContent = status;
+                document.getElementById('bz-status-label').style.color = color;
+            }
+            drawMoonPhase();
+            setTimeout(updateSpaceData, 300000); // 5 minutes
+        }
+
+        // Clock
+        const clockCanvas = document.getElementById('clock-canvas');
+        const clockCtx = clockCanvas.getContext('2d');
+
+        function drawClock() {
+            clockCtx.clearRect(0, 0, clockCanvas.width, clockCanvas.height);
+            const cx = 210, cy = 230, radius = 180;
+            clockCtx.fillStyle = '#1a1a1a';
+            clockCtx.beginPath();
+            clockCtx.arc(cx, cy, radius + 15, 0, 2 * Math.PI);
+            clockCtx.fill();
+            clockCtx.strokeStyle = '#333333';
+            clockCtx.lineWidth = 8;
+            clockCtx.stroke();
+            clockCtx.fillStyle = '#0b0b0b';
+            clockCtx.beginPath();
+            clockCtx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            clockCtx.fill();
+            clockCtx.strokeStyle = '#444444';
+            clockCtx.lineWidth = 4;
+            clockCtx.stroke();
+
+            for (let i = 0; i < 60; i++) {
+                const angle = (i * 6 - 90) * Math.PI / 180;
+                let length, width, color;
+                if (i % 5 === 0) {
+                    length = 35; width = 6; color = i % 15 === 0 ? '#d4af37' : '#aaaaaa';
+                } else {
+                    length = 15; width = 3; color = '#666666';
+                }
+                const x1 = cx + Math.cos(angle) * (radius - length);
+                const y1 = cy + Math.sin(angle) * (radius - length);
+                const x2 = cx + Math.cos(angle) * radius;
+                const y2 = cy + Math.sin(angle) * radius;
+                clockCtx.strokeStyle = color;
+                clockCtx.lineWidth = width;
+                clockCtx.beginPath();
+                clockCtx.moveTo(x1, y1);
+                clockCtx.lineTo(x2, y2);
+                clockCtx.stroke();
+            }
+
+            for (let h = 0; h < 24; h += 3) {
+                const angle = (h * 15 - 90) * Math.PI / 180;
+                const x = cx + Math.cos(angle) * (radius * 0.82);
+                const y = cy + Math.sin(angle) * (radius * 0.82);
+                clockCtx.fillStyle = '#e6d7a6';
+                clockCtx.font = 'bold 18px Helvetica';
+                clockCtx.textAlign = 'center';
+                clockCtx.textBaseline = 'middle';
+                clockCtx.fillText(h.toString(), x, y);
+            }
+
+            const now = new Date();
+            const h = now.getHours() % 24 + now.getMinutes() / 60 + now.getSeconds() / 3600;
+            const m = now.getMinutes() + now.getSeconds() / 60;
+            const s = now.getSeconds() + now.getMilliseconds() / 1000;
+
+            // Hour hand
+            const ha = (h * 15 - 90) * Math.PI / 180;
+            clockCtx.strokeStyle = '#d4af37';
+            clockCtx.lineWidth = 10;
+            clockCtx.lineCap = 'round';
+            clockCtx.beginPath();
+            clockCtx.moveTo(cx, cy);
+            clockCtx.lineTo(cx + Math.cos(ha) * radius * 0.52, cy + Math.sin(ha) * radius * 0.52);
+            clockCtx.stroke();
+
+            // Minute hand
+            const ma = (m * 6 - 90) * Math.PI / 180;
+            clockCtx.strokeStyle = '#cccccc';
+            clockCtx.lineWidth = 7;
+            clockCtx.beginPath();
+            clockCtx.moveTo(cx, cy);
+            clockCtx.lineTo(cx + Math.cos(ma) * radius * 0.78, cy + Math.sin(ma) * radius * 0.78);
+            clockCtx.stroke();
+
+            // Second hand
+            const sa = (s * 6 - 90) * Math.PI / 180;
+            clockCtx.strokeStyle = '#ff3333';
+            clockCtx.lineWidth = 3;
+            clockCtx.beginPath();
+            clockCtx.moveTo(cx, cy);
+            clockCtx.lineTo(cx + Math.cos(sa) * radius * 0.90, cy + Math.sin(sa) * radius * 0.90);
+            clockCtx.stroke();
+
+            // Center dot
+            clockCtx.fillStyle = '#d4af37';
+            clockCtx.beginPath();
+            clockCtx.arc(cx, cy, 14, 0, 2 * Math.PI);
+            clockCtx.fill();
+
+            // Digital time
+            clockCtx.fillStyle = '#cccccc';
+            clockCtx.font = 'bold 20px Consolas';
+            clockCtx.textAlign = 'center';
+            clockCtx.fillText(`${now.toLocaleTimeString()} \n ${now.toLocaleDateString()}`, cx, cy + radius + 50);
+
+            requestAnimationFrame(drawClock);
+        }
+
+        // Sun frames
+        async function fetchSunFrames(nFrames = 12, cadenceSeconds = 20) {
+            const frms = [];
+            const now = new Date();
+            for (let i = 0; i < nFrames; i++) {
+                const dt = new Date(now - i * cadenceSeconds * 1000);
+                const iso = dt.toISOString().slice(0, 19) + 'Z';
+                try {
+                    const resp = await fetch(`${HELIO_API_BASE}/getClosestImage/?date=${iso}&sourceId=${HELIO_SOURCE_ID}`);
+                    const data = await resp.json();
+                    if (data.url) frms.push(data.url);
+                } catch {}
+            }
+            return frms;
+        }
+
+        const sunImg = document.getElementById('sun-img');
+
+        async function animateSun() {
+            if (frames.length === 0) {
+                frames = await fetchSunFrames();
+            }
+            if (frames.length) {
+                sunImg.src = frames[frameIndex % frames.length];
+                frameIndex++;
+            }
+            setTimeout(animateSun, 500);
+        }
+
+        // Charts
+        let goesChart, kpChart, xrayChart;
+
+        function initCharts() {
+            // GOES Chart
+            goesChart = new Chart(document.getElementById('goes-chart').getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'GOES X-ray Flux', data: [], borderColor: 'orange' }] },
+                options: { scales: { x: { type: 'time' } }, plugins: { title: { display: true, text: 'GOES X-ray Flux (останній день)' } } }
+            });
+
+            // KP Chart
+            kpChart = new Chart(document.getElementById('kp-chart').getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Kp Index', data: [], borderColor: 'red' }] },
+                options: { scales: { x: { type: 'time' }, y: { min: 0, max: 9 } }, plugins: { title: { display: true, text: 'Kp Index (останні 50 точок)' } } }
+            });
+
+            // Xray Chart
+            xrayChart = new Chart(document.getElementById('xray-chart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        { label: '0.1-0.8 nm', data: [], borderColor: '#ffaa00' },
+                        { label: '0.05-0.4 nm', data: [], borderColor: '#ff00ff' }
+                    ]
+                },
+                options: {
+                    scales: { x: { type: 'time' }, y: { type: 'logarithmic', min: 1e-8, max: 1e-3 } },
+                    plugins: { title: { display: true, text: 'GOES X-ray Flux' } }
+                }
+            });
+        }
+
+        async function updateSolarLive() {
+            // Update GOES
+            try {
+                const resp = await fetch(GOES_XRAY_URL);
+                const data = await resp.json();
+                const times = data.map(d => new Date(d.time_tag));
+                const values = data.map(d => parseFloat(d.flux));
+                goesChart.data.labels = times;
+                goesChart.data.datasets[0].data = values;
+                goesChart.update();
+            } catch {}
+
+            // Update KP
+            try {
+                const resp = await fetch(KP_URL);
+                const data = await resp.json().slice(-50);
+                const times = data.map(d => new Date(d.time_tag));
+                const kp = data.map(d => parseFloat(d.kp_index));
+                kpChart.data.labels = times;
+                kpChart.data.datasets[0].data = kp;
+                kpChart.update();
+            } catch {}
+
+            // Update sun frames
+            frames = await fetchSunFrames();
+
+            setTimeout(updateSolarLive, 300000);
+        }
+
+        async function updateBigXray() {
+            const { ts, fs, tl, fl } = await getGoesXrayFull();
+            if (ts.length) {
+                xrayChart.data.datasets[0].data = ts.map((t, i) => ({ x: t, y: fs[i] }));
+                xrayChart.data.datasets[1].data = tl.map((t, i) => ({ x: t, y: fl[i] }));
+                xrayChart.update();
+            }
+            setTimeout(updateBigXray, 300000);
+        }
+
+        // Video Player - для GitHub Pages використовуйте статичні URL відео
+        const videoPlayer = document.getElementById('video-player');
+        const videoSources = ['https://example.com/video1.mp4', 'https://example.com/video2.mp4']; // Додайте ваші URL
+        let currentVideoIndex = 0;
+
+        function playNextVideo() {
+            if (videoSources.length) {
+                videoPlayer.src = videoSources[currentVideoIndex];
+                currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
+                videoPlayer.play();
+            }
+        }
+
+        videoPlayer.addEventListener('ended', playNextVideo);
+
+        // Init
+        initCharts();
+        updateSpaceData();
+        animateSun();
+        updateSolarLive();
+        updateBigXray();
+        drawClock();
+        playNextVideo();
+    </script>
+</body>
+</html>
