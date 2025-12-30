@@ -11,65 +11,73 @@
         html,body {
             height:100%; width:100%;
             background:#000;
-            color:#9fe7ff;
+            color:#88ddff;
             font-family:"Courier New",monospace;
             overflow:hidden;
         }
         canvas#stars { position:fixed; inset:0; z-index:0; }
         .wrapper {
             position:relative; z-index:2;
-            height:100%; padding:16px;
-            display:flex; flex-direction:column; gap:20px;
+            height:100%; padding:20px;
+            display:flex; flex-direction:column; gap:28px;
             align-items:center; justify-content:flex-start;
             overflow-y:auto;
         }
         h1 {
-            color:#4dd2ff; font-size:18px; letter-spacing:1.5px;
-            text-shadow:0 0 8px rgba(77,210,255,.6);
+            font-size:15px; letter-spacing:2px; opacity:0.8;
+            text-shadow:0 0 6px rgba(100,200,255,0.3);
         }
         .block {
-            width:100%; max-width:460px;
-            display:flex; flex-direction:column; gap:12px;
+            width:100%; max-width:420px;
+            display:flex; flex-direction:column; gap:14px;
             align-items:center; text-align:center;
         }
         input,button{
-            background:transparent; border:1px solid #4dd2ff;
-            color:#4dd2ff; padding:8px 12px;
-            font-size:14px; cursor:pointer;
-            transition:.3s;
+            background:transparent;
+            border:none; border-bottom:1px solid rgba(100,200,255,0.4);
+            color:#88ddff; padding:6px 0;
+            font-size:13px; letter-spacing:1px;
+            outline:none; transition:.3s;
         }
-        button:hover{background:rgba(77,210,255,.15);}
-        p {font-size:14px; letter-spacing:1.2px; opacity:0.9;}
+        input::placeholder { color:rgba(100,200,255,0.5); }
+        button{cursor:pointer; opacity:0.8;}
+        button:hover{opacity:1; text-shadow:0 0 6px rgba(100,200,255,0.5);}
+        p {font-size:13px; letter-spacing:1.4px; opacity:0.7; line-height:1.5;}
         #cycle-frame{
-            display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+            display:flex; flex-wrap:wrap; justify-content:center; gap:10px;
         }
         .cycle-label{
-            width:40px; height:40px;
-            border:1px solid #4dd2ff; color:#4dd2ff;
+            width:36px; height:36px;
             display:flex; align-items:center; justify-content:center;
-            font-size:14px;
+            font-size:12px; letter-spacing:1px;
+            opacity:0.6; transition:.3s;
         }
         .highlighted{
-            background:#4dd2ff; color:#000;
-            box-shadow:0 0 12px rgba(77,210,255,.8);
+            opacity:1; color:#ffffff;
+            text-shadow:0 0 8px rgba(100,200,255,0.8);
         }
         .kp-bar {
-            width:360px; height:40px;
-            background:#222;
-            border:1px solid #4dd2ff;
-            position:relative;
-            box-shadow:0 0 10px rgba(77,210,255,.4);
+            width:300px; height:4px;
+            background:rgba(100,200,255,0.15);
+            position:relative; margin:8px 0;
         }
         .kp-fill {
-            height:100%; background:#4dd2ff;
-            transition:width 0.5s;
+            height:100%; width:0%;
+            background:linear-gradient(90deg, #88ddff, #44aaff);
+            transition:width 0.8s ease;
+            box-shadow:0 0 8px rgba(100,200,255,0.4);
         }
         .kp-text {
-            position:absolute; top:0; left:0; width:100%; height:100%;
-            display:flex; align-items:center; justify-content:center;
-            color:#4dd2ff; font-size:14px;
+            font-size:13px; opacity:0.9;
         }
-        canvas {border:1px solid #4dd2ff; box-shadow:0 0 10px rgba(77,210,255,.4); background:#000;}
+        canvas#moon-canvas {
+            opacity:0.85;
+        }
+        .storm-warning {
+            font-size:13px; letter-spacing:1.4px;
+            opacity:0.9; padding:6px 0;
+            transition:opacity 0.5s;
+        }
     </style>
 </head>
 <body>
@@ -78,21 +86,21 @@
     <h1>IBONARIUM COSMO LAB</h1>
 
     <div class="block">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
             <input type="text" id="date-entry" placeholder="YYYY-MM-DD">
             <button onclick="showIbonarium()">ДЕНЬ</button>
         </div>
-        <p id="result-label" style="white-space:pre-line;"></p>
+        <p id="result-label" style="white-space:pre-line;opacity:0.8;"></p>
 
         <div id="cycle-frame"></div>
     </div>
 
     <div class="block">
-        <p>KP-ІНДЕКС</p>
+        <p class="kp-text" id="kp-text">KP: —</p>
         <div class="kp-bar">
-            <div class="kp-fill" id="kp-fill" style="width:0%"></div>
-            <div class="kp-text" id="kp-text">KP: —</div>
+            <div class="kp-fill" id="kp-fill"></div>
         </div>
+        <p class="storm-warning" id="storm-warning"></p>
     </div>
 
     <div class="block">
@@ -113,18 +121,23 @@
     const s=document.getElementById("stars"),ctx=s.getContext("2d");
     let W,H,stars=[];
     function resize(){W=s.width=innerWidth;H=s.height=innerHeight;
-        stars=Array.from({length:120},()=>({x:Math.random()*W,y:Math.random()*H,z:Math.random()*W}));
+        stars=Array.from({length:100},()=>({x:Math.random()*W,y:Math.random()*H,z:Math.random()*W}));
     }
     resize(); window.addEventListener("resize",resize);
     function drawStars(){
-        ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
-        ctx.fillStyle="#4dd2ff";
+        ctx.fillStyle="rgba(0,0,0,0.1)"; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="#88ddff";
         stars.forEach(st=>{
-            st.z-=0.15; if(st.z<=0)st.z=W;
-            const k=100/st.z;
+            st.z-=0.08; if(st.z<=0)st.z=W;
+            const k=80/st.z;
             const x=(st.x-W/2)*k+W/2, y=(st.y-H/2)*k+H/2;
-            if(x>0&&x<W&&y>0&&y<H) ctx.fillRect(x,y,(1-st.z/W)*1.8,(1-st.z/W)*1.8);
+            if(x>0&&x<W&&y>0&&y<H){
+                const size=(1-st.z/W)*1.2;
+                ctx.globalAlpha=1-st.z/W;
+                ctx.fillRect(x,y,size,size);
+            }
         });
+        ctx.globalAlpha=1;
         requestAnimationFrame(drawStars);
     }
     drawStars();
@@ -169,7 +182,7 @@
             for(let i=d.length-1;i>=0;i--){
                 if(d[i].kp_index!==null) return parseFloat(d[i].kp_index);
             }
-        }catch(e){console.error(e);}
+        }catch{}
         return null;
     }
     async function getSW(){
@@ -204,14 +217,36 @@
     /* KP BAR */
     const kpFill=document.getElementById('kp-fill');
     const kpText=document.getElementById('kp-text');
+    const stormWarning=document.getElementById('storm-warning');
     function updateKpBar(){
         if(currentKp===null){
             kpText.textContent='KP: —';
             kpFill.style.width='0%';
-        }else{
-            kpText.textContent=`KP: ${currentKp.toFixed(2)}`;
-            kpFill.style.width=`${currentKp*10}%`;
+            stormWarning.textContent='';
+            return;
         }
+        kpText.textContent=`KP: ${currentKp.toFixed(2)}`;
+        kpFill.style.width=`${currentKp*10}%`;
+
+        let message = '';
+        let color = '#88ddff';
+        if(currentKp >= 7){
+            message = 'ГЕОМАГНІТНА БУРЯ G3 — СИЛЬНА';
+            color = '#ff3366';
+        } else if(currentKp >= 6){
+            message = 'ГЕОМАГНІТНА БУРЯ G2 — ПОМІРНА';
+            color = '#ff6666';
+        } else if(currentKp >= 5){
+            message = 'ГЕОМАГНІТНА БУРЯ G1 — СЛАБКА';
+            color = '#ffaa66';
+        } else if(currentKp >= 4){
+            message = 'АКТИВНІ УМОВИ — МОЖЛИВІ ПОЛЯРНІ СЯЙВА';
+            color = '#ffcc88';
+        }
+
+        stormWarning.textContent = message;
+        stormWarning.style.color = color;
+        stormWarning.style.opacity = message ? '1' : '0';
     }
 
     /* MOON */
@@ -219,12 +254,14 @@
     function drawMoon(){
         moonX.clearRect(0,0,moonC.width,moonC.height);
         const p=moonPhase();
-        moonX.fillStyle='#4dd2ff'; moonX.beginPath(); moonX.arc(50,50,40,0,Math.PI*2); moonX.fill();
+        moonX.shadowBlur=10; moonX.shadowColor="rgba(100,200,255,0.6)";
+        moonX.fillStyle='#88ddff'; moonX.beginPath(); moonX.arc(50,50,40,0,Math.PI*2); moonX.fill();
+        moonX.shadowBlur=0;
         moonX.fillStyle='#000'; moonX.beginPath();
         if(p<0.5) moonX.arc(50,50,40,Math.PI/2,Math.PI*3/2,true);
         else moonX.arc(50,50,40,Math.PI*3/2,Math.PI/2,true);
         moonX.fill();
-        moonX.fillStyle='#4dd2ff'; moonX.font='14px "Courier New"'; moonX.textAlign='center';
+        moonX.fillStyle='#88ddff'; moonX.font='13px "Courier New"'; moonX.textAlign='center';
         moonX.fillText((p*100).toFixed(0)+'%',50,105);
     }
 
@@ -237,27 +274,28 @@
         const [spd,den]=await getSW();
         if(spd&&den){
             document.getElementById('solar-wind-label').textContent=`ШВИДКІСТЬ: ${spd.toFixed(0)} KM/S │ ЩІЛЬНІСТЬ: ${den.toFixed(1)} P/CM³`;
-            document.getElementById('solar-wind-label').style.color=spd>600?'#4dd2ff':'#9fe7ff';
+            document.getElementById('solar-wind-label').style.opacity= spd>600 ? '1' : '0.8';
         }
 
         const bz=await getBz();
         if(bz!==null){
-            let col,status;
-            if(bz<-12){col='#ff0000';status='ЕКСТРЕМАЛЬНА БУРЯ — АВРОРА В УКРАЇНІ!';}
-            else if(bz<-8){col='#ff3333';status='СИЛЬНА БУРЯ';}
-            else if(bz<-5){col='#ff8833';status='ПОПЕРЕДЖЕННЯ';}
-            else if(bz<0){col='#ffaa33';status='ПІВДЕННИЙ BZ — СТЕЖИМО';}
-            else if(bz>8){col='#00ff00';status='АБСОЛЮТНИЙ СПОКІЙ';}
-            else if(bz>3){col='#88ff88';status='СПОКІЙНО';}
-            else{col='#ffff66';status='НЕЙТРАЛЬНО';}
+            let col,status,op=1;
+            if(bz<-12){col='#ff3366';status='ЕКСТРЕМАЛЬНА БУРЯ — АВРОРА В УКРАЇНІ!';op=1;}
+            else if(bz<-8){col='#ff6666';status='СИЛЬНА БУРЯ';}
+            else if(bz<-5){col='#ffaa66';status='ПОПЕРЕДЖЕННЯ';}
+            else if(bz<0){col='#ffcc88';status='ПІВДЕННИЙ BZ — СТЕЖИМО';}
+            else if(bz>8){col='#66ff99';status='АБСОЛЮТНИЙ СПОКІЙ';}
+            else if(bz>3){col='#99ffcc';status='СПОКІЙНО';}
+            else{col='#dddd88';status='НЕЙТРАЛЬНО';}
             document.getElementById('bz-label').textContent=`BZ: ${bz.toFixed(1)} НТ`;
             document.getElementById('bz-label').style.color=col;
             document.getElementById('bz-status-label').textContent=status;
             document.getElementById('bz-status-label').style.color=col;
+            document.getElementById('bz-status-label').style.opacity=op;
         }
 
         drawMoon();
-        setTimeout(updateAll,300000); // 5 хвилин
+        setTimeout(updateAll,300000);
     }
 
     /* INIT */
