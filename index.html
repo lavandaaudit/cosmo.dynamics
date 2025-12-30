@@ -1,247 +1,344 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="referrer" content="no-referrer">
-    <meta name="robots" content="noindex,nofollow">
-    <title>ibonarium.cosmo.lab</title>
-    <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        html,body {
-            height:100%; width:100%;
-            background:#000;
-            color:#88ddff;
-            font-family:"Courier New",monospace;
-            overflow:hidden;
-        }
-        canvas#stars { position:fixed; inset:0; z-index:0; }
-        .wrapper {
-            position:relative; z-index:2;
-            height:100%; padding:20px;
-            display:flex; flex-direction:column; gap:32px;
-            align-items:center; justify-content:flex-start;
-            overflow-y:auto;
-        }
-        h1 {
-            font-size:15px; letter-spacing:2px; opacity:0.8;
-            text-shadow:0 0 6px rgba(100,200,255,0.3);
-        }
-        .block {
-            width:100%; max-width:420px;
-            display:flex; flex-direction:column; gap:14px;
-            align-items:center; text-align:center;
-        }
-        p {font-size:13px; letter-spacing:1.4px; opacity:0.7; line-height:1.5;}
-        .kp-bar {
-            width:300px; height:4px;
-            background:rgba(100,200,255,0.15);
-            position:relative; margin:8px 0;
-        }
-        .kp-fill {
-            height:100%; width:0%;
-            background:linear-gradient(90deg, #88ddff, #44aaff);
-            transition:width 0.8s ease;
-            box-shadow:0 0 8px rgba(100,200,255,0.4);
-        }
-        .kp-text {
-            font-size:13px; opacity:0.9;
-        }
-        canvas#moon-canvas {
-            opacity:0.85;
-        }
-        .storm-warning {
-            font-size:13px; letter-spacing:1.4px;
-            opacity:0.9; padding:6px 0;
-            transition:opacity 0.5s;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Живий Місяць • Фаза та Вид</title>
+<style>
+/* ================= RESET & BODY ================= */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #9fe7ff;
+  font-family: "Courier New", monospace;
+  overflow: hidden;
+}
+/* ================= STARS BACKGROUND ================= */
+#starsCanvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+/* ================= MOON CANVAS ================= */
+#moonCanvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+/* ================= WRAPPER (внизу) ================= */
+.wrapper {
+  position: fixed;
+  bottom: 15px;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  pointer-events: none;
+}
+/* ================= БЛОК ДАНИХ МІСЯЦЯ ================= */
+.moon-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  text-align: center;
+}
+.moon-data .title {
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  opacity: 0.8;
+}
+.moon-data .phase-bar {
+  width: 260px;
+  height: 4px;
+  background: rgba(77,210,255,0.15);
+  position: relative;
+  margin: 4px 0;
+}
+.moon-data .phase-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #9fe7ff, #4dd2ff);
+  transition: width 0.8s ease;
+  box-shadow: 0 0 8px rgba(77,210,255,0.4);
+}
+.moon-data .data-line {
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  opacity: 0.9;
+}
+/* ================= CONTROLS ================= */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+button {
+  background: transparent;
+  border: 1px solid #4dd2ff;
+  color: #4dd2ff;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.3s;
+  pointer-events: auto;
+}
+button:hover {
+  background: rgba(77,210,255,0.15);
+  box-shadow: 0 0 10px rgba(77,210,255,0.6);
+}
+button.active {
+  background: #4dd2ff;
+  color: #000;
+  box-shadow: 0 0 18px #4dd2ff;
+}
+/* ================= TEXT ================= */
+.text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  pointer-events: auto;
+}
+.main-text {
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+.sub-text {
+  font-size: 12px;
+  letter-spacing: 1px;
+  opacity: 0.8;
+}
+.footer-text {
+  font-size: 10px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+}
+.footer-text a {
+  color: #4dd2ff;
+  text-decoration: underline;
+}
+/* ================= MOBILE ================= */
+@media (max-width: 600px) {
+  button {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+  .main-text { font-size: 13px; }
+  .sub-text { font-size: 11px; }
+  .footer-text { font-size: 9px; }
+  .wrapper { bottom: 8px; gap: 8px; }
+  .moon-data .phase-bar { width: 200px; }
+  .moon-data .title, .moon-data .data-line {
+    font-size: 10px;
+  }
+}
+</style>
 </head>
 <body>
-<canvas id="stars"></canvas>
+<canvas id="starsCanvas"></canvas>
+<canvas id="moonCanvas"></canvas>
 <div class="wrapper">
-    <h1>IBONARIUM COSMO LAB</h1>
-
-    <div class="block">
-        <p class="kp-text" id="kp-text">KP: —</p>
-        <div class="kp-bar">
-            <div class="kp-fill" id="kp-fill"></div>
-        </div>
-        <p class="storm-warning" id="storm-warning"></p>
+  <!-- Блок даних Місяця -->
+  <div class="moon-data">
+    <div class="title">ФАЗА МІСЯЦЯ</div>
+   
+    <div>
+      <div class="data-line" id="phase-text">ФАЗА: —</div>
+      <div class="phase-bar">
+        <div class="phase-fill" id="phase-fill"></div>
+      </div>
     </div>
-
-    <div class="block">
-        <p>СОНЯЧНИЙ ВІТЕР</p>
-        <p id="solar-wind-label">ШВИДКІСТЬ: — KM/S │ ЩІЛЬНІСТЬ: — P/CM³</p>
-        <p id="bz-label">BZ: — НТ</p>
-        <p id="bz-status-label">ОЧІКУВАННЯ ДАНИХ...</p>
+   
+    <div class="data-line" id="illumination-label">ОСВІТЛЕНІСТЬ: — %</div>
+    <div class="data-line" id="age-label">ВІК: — ДНІВ</div>
+    <div class="data-line" id="distance-label">ВІДСТАНЬ: — КМ</div>
+  </div>
+  <!-- Кнопки масштабування -->
+  <div class="controls">
+    <button id="minusBtn">–</button>
+    <button id="plusBtn">+</button>
+  </div>
+  <!-- Текстова інформація -->
+  <div class="text-block">
+    <div class="main-text" id="photoTime">завантаження...</div>
+    <div class="sub-text">
+      Ibonarium Cosmo Dynamics Lab LIVE — Center for Space & Planetary Monitoring
     </div>
-
-    <div class="block">
-        <p>ФАЗА МІСЯЦЯ</p>
-        <canvas id="moon-canvas" width="100" height="120"></canvas>
+    <div class="footer-text">
+      <a href="https://t.me/ibonariumcosmodynamicslablive" target="_blank">
+        https://t.me/ibonariumcosmodynamicslablive
+      </a>
+      <br>
+      2026 ibonarium project by Roman Katyuschenko
     </div>
+  </div>
 </div>
-
 <script>
-    /* STARFIELD */
-    const s=document.getElementById("stars"),ctx=s.getContext("2d");
-    let W,H,stars=[];
-    function resize(){W=s.width=innerWidth;H=s.height=innerHeight;
-        stars=Array.from({length:100},()=>({x:Math.random()*W,y:Math.random()*H,z:Math.random()*W}));
+/* ================= STARS BACKGROUND ================= */
+const starsCanvas = document.getElementById("starsCanvas");
+const sctx = starsCanvas.getContext("2d");
+let W = starsCanvas.width = window.innerWidth;
+let H = starsCanvas.height = window.innerHeight;
+const stars = [];
+const numStars = 300;
+for (let i = 0; i < numStars; i++) {
+  stars.push({
+    x: Math.random() * W,
+    y: Math.random() * H,
+    size: Math.random() * 1.5 + 0.5,
+    speed: Math.random() * 0.5 + 0.1,
+    opacity: Math.random() * 0.8 + 0.2
+  });
+}
+function drawStars() {
+  sctx.clearRect(0, 0, W, H);
+  sctx.fillStyle = "#fff";
+  stars.forEach(star => {
+    sctx.globalAlpha = star.opacity;
+    sctx.fillRect(star.x, star.y, star.size, star.size);
+    star.y += star.speed;
+    if (star.y > H) star.y = 0;
+  });
+  sctx.globalAlpha = 1;
+  requestAnimationFrame(drawStars);
+}
+drawStars();
+
+/* ================= MOON CANVAS ================= */
+const moonCanvas = document.getElementById('moonCanvas');
+const ctx = moonCanvas.getContext('2d');
+moonCanvas.width = W;
+moonCanvas.height = H;
+let scale = 0.5; // Трохи більший стартовий масштаб для Місяця
+let img = new Image();
+const photoTimeEl = document.getElementById("photoTime");
+const fallbackURL = "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg"; // Фолбек: повний Місяць
+
+async function loadMoon() {
+  // Використовуємо TheSkyLive для актуального вигляду фази Місяця (рендериться динамічно)
+  const url = "https://theskylive.com/assets/moon/moon_phase.jpg?" + Date.now();
+  
+  return new Promise((resolve) => {
+    img.onload = () => {
+      const now = new Date();
+      photoTimeEl.textContent = now.toISOString().replace("T", " ").split(".")[0] + " UTC";
+      drawMoon();
+      resolve();
+    };
+    img.onerror = () => {
+      console.warn("Fallback до статичного зображення");
+      photoTimeEl.textContent = "немає зв'язку (static)";
+      img.src = fallbackURL;
+      drawMoon();
+      resolve();
+    };
+    img.src = url;
+  });
+}
+
+function drawMoon() {
+  ctx.clearRect(0, 0, W, H);
+  if (img.complete && img.naturalWidth > 0) {
+    const w = img.width * scale;
+    const h = img.height * scale;
+    const offsetY = H * -0.08;
+    ctx.drawImage(img, (W - w) / 2, (H - h) / 2 + offsetY, w, h);
+  }
+}
+
+/* ================= КЕРУВАННЯ МАСШТАБОМ ================= */
+document.getElementById("minusBtn").addEventListener("click", () => {
+  scale = Math.max(0.4, scale - 0.15);
+  drawMoon();
+});
+document.getElementById("plusBtn").addEventListener("click", () => {
+  scale = Math.min(2.5, scale + 0.15);
+  drawMoon();
+});
+moonCanvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (e.deltaY < 0) scale = Math.min(2.5, scale + 0.15);
+  if (e.deltaY > 0) scale = Math.max(0.4, scale - 0.15);
+  drawMoon();
+});
+
+/* ================= ДАНІ ФАЗИ МІСЯЦЯ ================= */
+// Використовуємо безкоштовний API з https://api.astronomyapi.com (потрібна реєстрація для ключа, тут приклад)
+// Альтернатива: простий розрахунок або статичний API. Тут використовуємо farmsense (якщо працює) або placeholder.
+const MOON_API_URL = "https://api.farmsense.net/v1/moonphases/?d=" + Math.floor(Date.now() / 1000);
+
+async function getMoonData() {
+  try {
+    const r = await fetch(MOON_API_URL);
+    const d = await r.json();
+    if (d && d.length > 0) {
+      const data = d[0];
+      return {
+        phase: data.Phase || "Невідома",
+        illumination: data.Illumination * 100 || 0,
+        age: data.Age || 0,
+        distance: data.Distance || 384400 // середня відстань як фолбек
+      };
     }
-    resize(); window.addEventListener("resize",resize);
-    function drawStars(){
-        ctx.fillStyle="rgba(0,0,0,0.1)"; ctx.fillRect(0,0,W,H);
-        ctx.fillStyle="#88ddff";
-        stars.forEach(st=>{
-            st.z-=0.08; if(st.z<=0)st.z=W;
-            const k=80/st.z;
-            const x=(st.x-W/2)*k+W/2, y=(st.y-H/2)*k+H/2;
-            if(x>0&&x<W&&y>0&&y<H){
-                const size=(1-st.z/W)*1.2;
-                ctx.globalAlpha=1-st.z/W;
-                ctx.fillRect(x,y,size,size);
-            }
-        });
-        ctx.globalAlpha=1;
-        requestAnimationFrame(drawStars);
-    }
-    drawStars();
+  } catch (e) { console.error(e); }
+  return null;
+}
 
-    /* SPACE DATA */
-    const KP_URL="https://services.swpc.noaa.gov/json/planetary_k_index_1m.json";
-    const SW_URL="https://services.swpc.noaa.gov/products/solar-wind/plasma-6-hour.json";
-    const BZ_URL="https://services.swpc.noaa.gov/products/solar-wind/mag-6-hour.json";
+function updateMoonData(data) {
+  const phaseText = document.getElementById('phase-text');
+  const phaseFill = document.getElementById('phase-fill');
+  const illumLabel = document.getElementById('illumination-label');
+  const ageLabel = document.getElementById('age-label');
+  const distLabel = document.getElementById('distance-label');
 
-    let currentKp = null;
+  if (!data) {
+    phaseText.textContent = 'ФАЗА: —';
+    phaseFill.style.width = '0%';
+    illumLabel.textContent = 'ОСВІТЛЕНІСТЬ: — %';
+    ageLabel.textContent = 'ВІК: — ДНІВ';
+    distLabel.textContent = 'ВІДСТАНЬ: — КМ';
+    return;
+  }
 
-    async function getKp(){
-        try{
-            const r=await fetch(KP_URL);
-            const d=await r.json();
-            for(let i=d.length-1;i>=0;i--){
-                if(d[i].kp_index!==null) return parseFloat(d[i].kp_index);
-            }
-        }catch{}
-        return null;
-    }
-    async function getSW(){
-        try{
-            const r=await fetch(SW_URL);
-            const d=await r.json();
-            for(let i=d.length-1;i>=0;i--){
-                const row=d[i];
-                if(row.length>=3 && row[1] && row[2]) return [parseFloat(row[1]), parseFloat(row[2])];
-            }
-        }catch{}
-        return [null,null];
-    }
-    async function getBz(){
-        try{
-            const r=await fetch(BZ_URL);
-            const d=await r.json();
-            for(let i=d.length-1;i>=0;i--){
-                const row=d[i];
-                if(row.length>=5 && row[4]) return parseFloat(row[4]);
-            }
-        }catch{}
-        return null;
-    }
-    function moonPhase(){
-        const m=29.53058867;
-        const e=new Date(Date.UTC(2000,0,6,18,14));
-        const diff=(new Date()-e)/86400000;
-        return (diff%m)/m;
-    }
+  phaseText.textContent = `ФАЗА: ${data.phase.toUpperCase()}`;
+  phaseFill.style.width = `${data.illumination}%`;
+  illumLabel.textContent = `ОСВІТЛЕНІСТЬ: ${data.illumination.toFixed(1)} %`;
+  ageLabel.textContent = `ВІК: ${data.age.toFixed(1)} ДНІВ`;
+  distLabel.textContent = `ВІДСТАНЬ: ${Math.round(data.distance)} КМ`;
+}
 
-    /* KP BAR */
-    const kpFill=document.getElementById('kp-fill');
-    const kpText=document.getElementById('kp-text');
-    const stormWarning=document.getElementById('storm-warning');
-    function updateKpBar(){
-        if(currentKp===null){
-            kpText.textContent='KP: —';
-            kpFill.style.width='0%';
-            stormWarning.textContent='';
-            return;
-        }
-        kpText.textContent=`KP: ${currentKp.toFixed(2)}`;
-        kpFill.style.width=`${currentKp*10}%`;
+async function updateMoonPhaseData() {
+  const data = await getMoonData();
+  updateMoonData(data);
+}
 
-        let message = '';
-        let color = '#88ddff';
-        if(currentKp >= 7){
-            message = 'ГЕОМАГНІТНА БУРЯ G3 — СИЛЬНА';
-            color = '#ff3366';
-        } else if(currentKp >= 6){
-            message = 'ГЕОМАГНІТНА БУРЯ G2 — ПОМІРНА';
-            color = '#ff6666';
-        } else if(currentKp >= 5){
-            message = 'ГЕОМАГНІТНА БУРЯ G1 — СЛАБКА';
-            color = '#ffaa66';
-        } else if(currentKp >= 4){
-            message = 'АКТИВНІ УМОВИ — МОЖЛИВІ ПОЛЯРНІ СЯЙВА';
-            color = '#ffcc88';
-        }
+/* ================= АВТООНОВЛЕННЯ ================= */
+setInterval(() => loadMoon(), 3600000); // Оновлення зображення щогодини (фаза змінюється повільно)
+setInterval(updateMoonPhaseData, 3600000); // Дані щогодини
 
-        stormWarning.textContent = message;
-        stormWarning.style.color = color;
-        stormWarning.style.opacity = message ? '1' : '0';
-    }
+/* ================= РЕСАЙЗ ================= */
+window.addEventListener("resize", () => {
+  W = starsCanvas.width = moonCanvas.width = window.innerWidth;
+  H = starsCanvas.height = moonCanvas.height = window.innerHeight;
+  drawMoon();
+});
 
-    /* MOON */
-    const moonC=document.getElementById('moon-canvas'),moonX=moonC.getContext('2d');
-    function drawMoon(){
-        moonX.clearRect(0,0,moonC.width,moonC.height);
-        const p=moonPhase();
-        moonX.shadowBlur=10; moonX.shadowColor="rgba(100,200,255,0.6)";
-        moonX.fillStyle='#88ddff'; moonX.beginPath(); moonX.arc(50,50,40,0,Math.PI*2); moonX.fill();
-        moonX.shadowBlur=0;
-        moonX.fillStyle='#000'; moonX.beginPath();
-        if(p<0.5) moonX.arc(50,50,40,Math.PI/2,Math.PI*3/2,true);
-        else moonX.arc(50,50,40,Math.PI*3/2,Math.PI/2,true);
-        moonX.fill();
-        moonX.fillStyle='#88ddff'; moonX.font='13px "Courier New"'; moonX.textAlign='center';
-        moonX.fillText((p*100).toFixed(0)+'%',50,105);
-    }
-
-    /* UPDATE ALL */
-    async function updateAll(){
-        const kp=await getKp();
-        if(kp!==null) currentKp=kp;
-        updateKpBar();
-
-        const [spd,den]=await getSW();
-        if(spd&&den){
-            document.getElementById('solar-wind-label').textContent=`ШВИДКІСТЬ: ${spd.toFixed(0)} KM/S │ ЩІЛЬНІСТЬ: ${den.toFixed(1)} P/CM³`;
-            document.getElementById('solar-wind-label').style.opacity= spd>600 ? '1' : '0.8';
-        }
-
-        const bz=await getBz();
-        if(bz!==null){
-            let col,status,op=1;
-            if(bz<-12){col='#ff3366';status='ЕКСТРЕМАЛЬНА БУРЯ — АВРОРА В УКРАЇНІ!';op=1;}
-            else if(bz<-8){col='#ff6666';status='СИЛЬНА БУРЯ';}
-            else if(bz<-5){col='#ffaa66';status='ПОПЕРЕДЖЕННЯ';}
-            else if(bz<0){col='#ffcc88';status='ПІВДЕННИЙ BZ — СТЕЖИМО';}
-            else if(bz>8){col='#66ff99';status='АБСОЛЮТНИЙ СПОКІЙ';}
-            else if(bz>3){col='#99ffcc';status='СПОКІЙНО';}
-            else{col='#dddd88';status='НЕЙТРАЛЬНО';}
-            document.getElementById('bz-label').textContent=`BZ: ${bz.toFixed(1)} НТ`;
-            document.getElementById('bz-label').style.color=col;
-            document.getElementById('bz-status-label').textContent=status;
-            document.getElementById('bz-status-label').style.color=col;
-            document.getElementById('bz-status-label').style.opacity=op;
-        }
-
-        drawMoon();
-        setTimeout(updateAll,300000);
-    }
-
-    /* INIT */
-    updateAll();
-    drawMoon();
+/* ================= СТАРТ ================= */
+loadMoon();
+updateMoonPhaseData();
 </script>
 </body>
 </html>
