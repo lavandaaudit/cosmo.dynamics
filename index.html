@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBONARIUM • LUNAR RESEARCH STATION</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="theme-dark">
+    <!-- Star Layer -->
+    <canvas id="starsCanvas"></canvas>
+
+    <!-- Moon Background Layer (Now fixed and independent) -->
+    <div class="moon-background-layer">
+        <canvas id="moonCanvas"></canvas>
+    </div>
+
+    <!-- Vignette above Moon, below HUD -->
+    <div class="vignette"></div>
+
+    <div class="hud-container">
+        <!-- Header -->
+        <header class="hud-header">
+            <div class="mission-id">MISSION: LUNAR-X1-SYNC</div>
+            <div class="station-name">
+                <div class="title">IBONARIUM COSMO</div>
+                <div class="subtitle">PLANETARY RESEARCH STATION</div>
+            </div>
+            <div class="system-clock" id="utc-clock">00:00:00 UTC</div>
+        </header>
+
+        <!-- Large Spacer to see the Moon -->
+        <div class="hud-main-spacer"></div>
+
+        <!-- Sticky Controls right under the moon visual area -->
+        <div class="view-controls">
+            <button class="btn-ctrl" id="zoomOut"><i data-lucide="minus"></i></button>
+            <button class="btn-ctrl active" id="viewNormal">STD</button>
+            <button class="btn-ctrl" id="viewInfrared">IR</button>
+            <button class="btn-ctrl" id="viewXray">XRY</button>
+            <button class="btn-ctrl" id="zoomIn"><i data-lucide="plus"></i></button>
+        </div>
+
+        <!-- Data Content Scrollable Flow -->
+        <div class="hud-sidebar">
+            <div class="module" id="lunar-telemetry">
+                <div class="module-header">TЕЛЕМЕТРІЯ МІСЯЦЯ</div>
+                <div class="module-content">
+                    <div class="data-item"><span class="label">PHASE</span><span class="value"
+                            id="phase-name">---</span></div>
+                    <div class="data-item"><span class="label">DISTANCE</span><span class="value" id="dist-val">---
+                            KM</span></div>
+                    <div class="data-item"><span class="label">ILLUMINATION</span><span class="value" id="phase-val">---
+                            %</span></div>
+                    <div class="data-item"><span class="label">LUNAR_AGE</span><span class="value" id="age-val">---
+                            D</span></div>
+                </div>
+            </div>
+
+            <div class="module" id="observatory-cams">
+                <div class="module-header">КАМЕРИ ОБСЕРВАТОРІЇ</div>
+                <div class="module-content">
+                    <div class="cam-feed">
+                        <div class="cam-label">CAM 01 // LRO_SURFACE</div>
+                        <img id="cam1-img" src="" alt="LRO Surface">
+                    </div>
+                    <div class="cam-feed">
+                        <div class="cam-label">CAM 02 // SPECTRAL_DATA</div>
+                        <img id="cam2-img" src="" alt="Spectral Scan">
+                    </div>
+                </div>
+            </div>
+
+            <div class="module" id="spectral-analysis">
+                <div class="module-header">АНАЛІЗ ПОВЕРХНІ ТА ЛІБРАЦІЯ</div>
+                <div class="module-content">
+                    <div class="data-item"><span class="label">TEMP</span><span class="value" id="temp-val">--- K</span>
+                    </div>
+                    <div class="data-item"><span class="label">LIB_L</span><span class="value" id="lib-l">---</span>
+                    </div>
+                    <div class="data-item"><span class="label">LIB_B</span><span class="value" id="lib-b">---</span>
+                    </div>
+                    <div class="data-item"><span class="label">ALBEDO</span><span class="value"
+                            id="albedo-val">---</span></div>
+                    <div class="data-item"><span class="label">HE-3</span><span class="value" id="he3-val">---
+                            ppm</span></div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="hud-footer">
+            <div class="ticker-wrap">
+                <div class="ticker" id="info-ticker">CORE SYNC ACTIVE • NASA SVS DATA STREAM OK • MISSION STATUS:
+                    NOMINAL</div>
+            </div>
+            <div class="copyright">© 2026 IBONARIUM COSMO Dynamics Lab</div>
+        </footer>
+    </div>
+
+    <!-- Final Overlay -->
+    <div class="scan-overlay"></div>
+
+    <!-- Modal -->
+    <div id="image-modal" class="modal">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modal-img">
+        <div id="modal-caption" class="modal-caption" style="color: var(--hud-cyan); margin-top: 20px;"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

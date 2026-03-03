@@ -1,0 +1,312 @@
+:root {
+    --bg-color: #000000;
+    --hud-cyan: #9fe7ff;
+    --hud-blue: #4dd2ff;
+    --hud-dim: rgba(159, 231, 255, 0.1);
+    --border-color: rgba(159, 231, 255, 0.15);
+    --font-main: "Courier New", monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body,
+html {
+    width: 100%;
+    min-height: 100%;
+    background: var(--bg-color);
+    color: var(--hud-cyan);
+    font-family: var(--font-main);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* BACKGROUND LAYERS */
+#starsCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* MOON AS BACKGROUND LAYER */
+.moon-background-layer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    height: 100vh;
+    z-index: 2;
+    pointer-events: auto;
+    /* Allow dragging the moon */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#moonCanvas {
+    display: block;
+    cursor: grab;
+}
+
+/* HUD CONTAINER */
+.hud-container {
+    position: relative;
+    width: 100%;
+    z-index: 10;
+    /* UI above moon */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    /* Let clicks pass to moon unless on button */
+}
+
+/* HEADER */
+.hud-header {
+    width: 100%;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.mission-id {
+    font-size: 0.6rem;
+    opacity: 0.5;
+    letter-spacing: 2px;
+}
+
+.station-name .title {
+    font-size: 1.5rem;
+    letter-spacing: 12px;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(159, 231, 255, 0.4);
+}
+
+.station-name .subtitle {
+    font-size: 0.6rem;
+    opacity: 0.4;
+    letter-spacing: 5px;
+}
+
+/* SPACER TO SHOW MOON */
+.hud-main-spacer {
+    height: 60vh;
+    width: 100%;
+}
+
+/* STICKY CONTROLS */
+.view-controls {
+    position: sticky;
+    top: 20px;
+    display: flex;
+    gap: 30px;
+    padding: 20px;
+    pointer-events: auto;
+    z-index: 100;
+}
+
+.btn-ctrl {
+    background: transparent;
+    border: none;
+    color: var(--hud-cyan);
+    padding: 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: 0.3s;
+}
+
+.btn-ctrl:hover,
+.btn-ctrl.active {
+    opacity: 1;
+    text-shadow: 0 0 15px var(--hud-cyan);
+}
+
+/* CENTERED DATA FLOW */
+.hud-sidebar {
+    width: 100%;
+    max-width: 900px;
+    padding: 100px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 80px;
+    pointer-events: auto;
+}
+
+.module {
+    width: 100%;
+    text-align: center;
+}
+
+.module-header {
+    font-size: 0.7rem;
+    color: var(--hud-blue);
+    margin-bottom: 30px;
+    letter-spacing: 4px;
+    opacity: 0.8;
+}
+
+.module-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 40px;
+}
+
+.data-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.data-item .label {
+    opacity: 0.4;
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+}
+
+.data-item .value {
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+/* CAMS IN FLOW */
+#observatory-cams .module-content {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.cam-feed {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(5px);
+    position: relative;
+    cursor: pointer;
+}
+
+.cam-feed img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.6;
+    filter: grayscale(1);
+    transition: 0.5s;
+}
+
+.cam-feed:hover img {
+    opacity: 1;
+    filter: grayscale(0);
+}
+
+/* FOOTER */
+.hud-footer {
+    width: 100%;
+    padding: 100px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    opacity: 0.5;
+}
+
+.ticker-wrap {
+    width: 100%;
+    max-width: 800px;
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, #000 20%, #000 80%, transparent);
+}
+
+.ticker {
+    display: inline-block;
+    white-space: nowrap;
+    animation: ticker 60s linear infinite;
+    font-size: 0.7rem;
+}
+
+@keyframes ticker {
+    0% {
+        transform: translate(100%, 0);
+    }
+
+    100% {
+        transform: translate(-100%, 0);
+    }
+}
+
+/* OVERLAYS */
+.scan-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    pointer-events: none;
+    opacity: 0.03;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.5) 50%);
+    background-size: 100% 4px;
+}
+
+.vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    background: radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.8) 100%);
+}
+
+/* MODAL */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.98);
+    backdrop-filter: blur(30px);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    max-width: 90%;
+    max-height: 85%;
+    border: 1px solid var(--border-color);
+}
+
+.modal-close {
+    position: absolute;
+    top: 30px;
+    right: 40px;
+    font-size: 50px;
+    cursor: pointer;
+    color: var(--hud-cyan);
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+    .station-name .title {
+        font-size: 1.1rem;
+        letter-spacing: 5px;
+    }
+
+    .hud-main-spacer {
+        height: 40vh;
+    }
+
+    .module-content {
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    .data-item .value {
+        font-size: 1rem;
+    }
+}
