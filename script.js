@@ -91,18 +91,26 @@ async function updateStation() {
 }
 
 async function tryFetchLunar(dateObj) {
-    const ts = dateObj.toISOString().split('.')[0].slice(0, 16);
-    try {
-        const response = await fetch(`${CONFIG.SVS_BASE_URL}${ts}`);
-        if (!response.ok) return false;
-        const data = await response.json();
+    // Використовуємо повний ISO (з секундами) — API може вимагати секунд
+    const ts = dateObj.toISOString().split('.')[0]; // e.g. 2026-06-21T12:34:56
+    const url = `${CONFIG.SVS_BASE_URL}${ts}`;
+    console.log('[LUNAR-X1] Fetching SVS URL:', url);
 
+    try {
+        const response = await fetch(url);
+        console.log('[LUNAR-X1] SVS response status:', response.status);
+        if (!response.ok) {
+            console.warn('[LUNAR-X1] SVS response not ok:', response.status, response.statusText);
+            return false;
+        }
+        const data = await response.json();
+        console.log('[LUNAR-X1] SVS data:', data);
         state.lunarData = data;
         updateLunarUI(data);
         logToConsole(`REAL-TIME DATA SYNC: OK [${ts}]`);
         return true;
     } catch (err) {
-        console.warn("Fetch Error:", err);
+        console.warn('[LUNAR-X1] Fetch Error:', err);
         return false;
     }
 }
@@ -115,20 +123,20 @@ function updateLunarUI(data) {
     const pnEl = document.getElementById('phase-name');
     if (pnEl) pnEl.textContent = phaseName;
 
-    // Numbers Update
+    // Numbers Update (сейф)
     const setVal = (id, val) => {
         const el = document.getElementById(id);
         if (el) el.textContent = val;
     };
 
-    setVal('dist-val', `${Math.round(data.distance).toLocaleString()} KM`);
-    setVal('phase-val', `${data.phase.toFixed(2)} %`);
-    setVal('age-val', `${data.age.toFixed(2)} D`);
+    setVal('dist-val', `${Math.round(data.distance || 0).toLocaleString()} KM`);
+    setVal('phase-val', `${(typeof data.phase === 'number' ? data.phase.toFixed(2) : '0.00')} %`);
+    setVal('age-val', `${(typeof data.age === 'number' ? data.age.toFixed(2) : '0.00')} D`);
     setVal('lib-l', data.subearth_lon ? data.subearth_lon.toFixed(2) : "0.00");
     setVal('lib-b', data.subearth_lat ? data.subearth_lat.toFixed(2) : "0.00");
 
     // Simulated Environmental Extras
-    const temp = (250 + Math.cos(data.age) * 150).toFixed(1);
+    const temp = (250 + Math.cos((data.age || 0)) * 150).toFixed(1);
     setVal('temp-val', temp + " K");
     setVal('he3-val', (15 + Math.random() * 5).toFixed(2) + " ppm");
     setVal('albedo-val', (0.12 + Math.random() * 0.02).toFixed(3));
@@ -136,11 +144,21 @@ function updateLunarUI(data) {
     // Ticker Update
     const ticker = document.getElementById('info-ticker');
     if (ticker) {
-        ticker.textContent = `ANALYSIS: ${phaseName} • ILLUMINATION: ${data.phase.toFixed(2)}% • TEMP: ${temp}K • LIBRATION ACTIVE • CORE SYNC: OK`;
+        const illumText = (typeof data.phase === 'number') ? data.phase.toFixed(2) + '%' : 'N/A';
+        ticker.textContent = `ANALYSIS: ${phaseName} • ILLUMINATION: ${illumText} • TEMP: ${temp}K • LIBRATION ACTIVE • CORE SYNC: OK`;
     }
 
-    // Render Moon
-    drawMoon(data.image.url);
+    // Безпечне витягнення URL зображення (кілька можливих полів)
+    const imageUrl =
+        (data.image && (data.image.url || data.image.href)) ||
+        data.url ||
+        (data.links && data.links[0] && data.links[0].href) ||
+        CONFIG.FALLBACK_MOON;
+
+    console.log('[LUNAR-X1] Resolved moon image URL:', imageUrl);
+
+    // Render Moon using resolved URL
+    drawMoon(imageUrl);
 }
 
 function getPhaseName(illum, age) {
@@ -156,12 +174,19 @@ function getPhaseName(illum, age) {
 function drawMoon(url) {
     const finalUrl = url || CONFIG.FALLBACK_MOON;
 
+    // При новому URL створюємо новий Image(), щоб скинути попередній стан помилок
     if (state.moonImg.src !== finalUrl) {
+        state.moonImg = new Image();
+        state.moonImg.crossOrigin = 'anonymous'; // допомагає виявляти CORS-помилки
         state.moonImg.onload = render;
         state.moonImg.onerror = () => {
-            console.error("Moon Image Load Fail:", finalUrl);
-            if (finalUrl !== CONFIG.FALLBACK_MOON) drawMoon(CONFIG.FALLBACK_MOON);
+            console.error("[LUNAR-X1] Moon Image Load Fail:", finalUrl);
+            if (finalUrl !== CONFIG.FALLBACK_MOON) {
+                // якщо не вдалось — пробуємо fallback
+                drawMoon(CONFIG.FALLBACK_MOON);
+            }
         };
+        // Можна додати cache-buster при потребі (поточне налаштування залишає URL без cb)
         state.moonImg.src = finalUrl;
     } else {
         render();
