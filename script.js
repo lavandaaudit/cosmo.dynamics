@@ -12,6 +12,7 @@ let state = {
     moonScale: 0.8,
     viewMode: 'STD',
     lunarData: null,
+    moonRenderData: null,
     moonImg: new Image(),
     ctx: {
         moon: null,
@@ -152,7 +153,7 @@ function updateLunarUI(data) {
     }
 
     // Render Moon
-    drawMoon(getMoonImageUrl(data));
+    drawMoon(getMoonImageUrl(data), data);
 }
 
 function getPhaseName(illum, age) {
@@ -165,14 +166,21 @@ function getPhaseName(illum, age) {
 }
 
 /* ================= RENDERING ================= */
-function drawMoon(url) {
+function drawMoon(url, data = null) {
     const finalUrl = url || CONFIG.FALLBACK_MOON;
+    state.moonRenderData = data;
 
     if (state.moonImg.src !== finalUrl) {
         state.moonImg.onload = render;
         state.moonImg.onerror = () => {
             console.error("Moon Image Load Fail:", finalUrl);
-            if (finalUrl !== CONFIG.FALLBACK_MOON) drawMoon(CONFIG.FALLBACK_MOON);
+            if (finalUrl !== CONFIG.FALLBACK_MOON) {
+                drawMoon(CONFIG.FALLBACK_MOON, {
+                    ...state.moonRenderData,
+                    image: { url: CONFIG.FALLBACK_MOON },
+                    isFallback: true
+                });
+            }
         };
         state.moonImg.src = finalUrl;
     } else {
@@ -198,9 +206,43 @@ function render() {
         ctx.shadowBlur = 50;
         ctx.shadowColor = "rgba(159, 231, 255, 0.15)";
         ctx.drawImage(state.moonImg, x, y, s, s);
+        applyFallbackPhaseShadow(ctx, x, y, s);
 
         applyViewFilter(canvas);
     }
+}
+
+function applyFallbackPhaseShadow(ctx, x, y, size) {
+    const data = state.moonRenderData;
+    if (!data?.isFallback) return;
+
+    const illum = Math.max(0, Math.min(100, data.phase)) / 100;
+    const isWaxing = data.age < 14.765;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+
+    const darkWidth = Math.max(0, 1 - illum) * size;
+    const darkX = isWaxing ? x : x + illum * size;
+    const terminatorX = isWaxing ? x + darkWidth : darkX;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
+    ctx.fillRect(darkX, y, darkWidth, size);
+
+    const gradient = ctx.createLinearGradient(terminatorX - size * 0.08, y, terminatorX + size * 0.08, y);
+    if (isWaxing) {
+        gradient.addColorStop(0, "rgba(0, 0, 0, 0.32)");
+        gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    } else {
+        gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+        gradient.addColorStop(1, "rgba(0, 0, 0, 0.32)");
+    }
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, size, size);
+
+    ctx.restore();
 }
 
 function applyViewFilter(canvas) {
@@ -245,12 +287,26 @@ function initStars() {
 
 /* ================= UTILS ================= */
 function fallbackLunarData() {
+    const estimate = calculateApproxLunarData(new Date());
     const mock = {
-        distance: 384400, phase: 50, age: 14.5,
+        distance: 384400,
+        phase: estimate.phase,
+        age: estimate.age,
         subearth_lon: 4.5, subearth_lat: 0.5,
-        image: { url: CONFIG.FALLBACK_MOON }
+        image: { url: CONFIG.FALLBACK_MOON },
+        isFallback: true
     };
     updateLunarUI(mock);
+}
+
+function calculateApproxLunarData(dateObj) {
+    const synodicMonth = 29.530588853;
+    const referenceNewMoon = Date.UTC(2000, 0, 6, 18, 14);
+    const daysSinceReference = (dateObj.getTime() - referenceNewMoon) / 86400000;
+    const age = ((daysSinceReference % synodicMonth) + synodicMonth) % synodicMonth;
+    const phase = (1 - Math.cos((Math.PI * 2 * age) / synodicMonth)) * 50;
+
+    return { age, phase };
 }
 
 function logToConsole(msg) {
