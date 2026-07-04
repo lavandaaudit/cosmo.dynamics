@@ -73,6 +73,8 @@ async function updateStation() {
     logToConsole("Syncing with NASA SVS...");
 
     const now = new Date();
+    updateLunarUI(createLocalLunarData(now));
+
     let fetched = false;
 
     // Dial-A-Moon publishes hourly frames. Minute-level timestamps can miss and
@@ -84,8 +86,7 @@ async function updateStation() {
     }
 
     if (!fetched) {
-        logToConsole("NASA API UNAVAILABLE. LOADING LOCAL ANALYTICS.");
-        fallbackLunarData();
+        logToConsole("NASA API UNAVAILABLE. USING LOCAL LUNAR MODEL.");
     }
 
     fetchCamImages();
@@ -120,8 +121,25 @@ function getMoonImageUrl(data) {
     return data?.image?.url || data?.su_image?.url || CONFIG.FALLBACK_MOON;
 }
 
+function normalizeLunarData(data) {
+    const safeData = data || {};
+    const fallback = createLocalLunarData(new Date());
+
+    return {
+        ...fallback,
+        ...safeData,
+        distance: Number.isFinite(safeData.distance) ? safeData.distance : fallback.distance,
+        phase: Number.isFinite(safeData.phase) ? safeData.phase : fallback.phase,
+        age: Number.isFinite(safeData.age) ? safeData.age : fallback.age,
+        subearth_lon: Number.isFinite(safeData.subearth_lon) ? safeData.subearth_lon : fallback.subearth_lon,
+        subearth_lat: Number.isFinite(safeData.subearth_lat) ? safeData.subearth_lat : fallback.subearth_lat,
+        image: safeData.image || fallback.image
+    };
+}
+
 function updateLunarUI(data) {
     if (!data) return;
+    data = normalizeLunarData(data);
 
     // Phase Name Logic
     const phaseName = getPhaseName(data.phase, data.age);
@@ -134,7 +152,7 @@ function updateLunarUI(data) {
         if (el) el.textContent = val;
     };
 
-    setVal('dist-val', `${Math.round(data.distance).toLocaleString()} KM`);
+    setVal('dist-val', `${Math.round(data.distance).toLocaleString('uk-UA')} KM`);
     setVal('phase-val', `${data.phase.toFixed(2)} %`);
     setVal('age-val', `${data.age.toFixed(2)} D`);
     setVal('lib-l', data.subearth_lon ? data.subearth_lon.toFixed(2) : "0.00");
@@ -214,7 +232,7 @@ function render() {
 
 function applyFallbackPhaseShadow(ctx, x, y, size) {
     const data = state.moonRenderData;
-    if (!data?.isFallback) return;
+    if (!data?.isFallback && !data?.isLocalEstimate) return;
 
     const illum = Math.max(0, Math.min(100, data.phase)) / 100;
     const isWaxing = data.age < 14.765;
@@ -286,17 +304,17 @@ function initStars() {
 }
 
 /* ================= UTILS ================= */
-function fallbackLunarData() {
-    const estimate = calculateApproxLunarData(new Date());
-    const mock = {
+function createLocalLunarData(dateObj) {
+    const estimate = calculateApproxLunarData(dateObj);
+    return {
         distance: 384400,
         phase: estimate.phase,
         age: estimate.age,
         subearth_lon: 4.5, subearth_lat: 0.5,
         image: { url: CONFIG.FALLBACK_MOON },
-        isFallback: true
+        isFallback: true,
+        isLocalEstimate: true
     };
-    updateLunarUI(mock);
 }
 
 function calculateApproxLunarData(dateObj) {
