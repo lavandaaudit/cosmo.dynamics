@@ -1,9 +1,10 @@
 /* ================= MISSION CONFIG ================= */
 const CONFIG = {
-    UPDATE_INTERVAL: 60000,
+    UPDATE_INTERVAL: 15 * 60 * 1000,
     SVS_BASE_URL: "https://svs.gsfc.nasa.gov/api/dialamoon/",
     NOAA_KP_URL: "https://services.swpc.noaa.gov/products/noaa-scales.json",
-    FALLBACK_MOON: "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg"
+    FALLBACK_MOON: "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg",
+    LUNAR_LOOKBACK_HOURS: 6
 };
 
 /* ================= STATE ================= */
@@ -71,13 +72,14 @@ async function updateStation() {
     logToConsole("Syncing with NASA SVS...");
 
     const now = new Date();
-    // Try current UTC time first
-    let fetched = await tryFetchLunar(now);
+    let fetched = false;
 
-    // If fail, try 1 hour ago (NASA often has slight delays in API publishing)
-    if (!fetched) {
-        const offsetDate = new Date(now.getTime() - 3600000);
+    // Dial-A-Moon publishes hourly frames. Minute-level timestamps can miss and
+    // leave the station stuck on the static fallback image.
+    for (let hourOffset = 0; hourOffset <= CONFIG.LUNAR_LOOKBACK_HOURS; hourOffset++) {
+        const offsetDate = new Date(now.getTime() - hourOffset * 3600000);
         fetched = await tryFetchLunar(offsetDate);
+        if (fetched) break;
     }
 
     if (!fetched) {
@@ -91,7 +93,7 @@ async function updateStation() {
 }
 
 async function tryFetchLunar(dateObj) {
-    const ts = dateObj.toISOString().split('.')[0].slice(0, 16);
+    const ts = formatLunarTimestamp(dateObj);
     try {
         const response = await fetch(`${CONFIG.SVS_BASE_URL}${ts}`);
         if (!response.ok) return false;
@@ -105,6 +107,16 @@ async function tryFetchLunar(dateObj) {
         console.warn("Fetch Error:", err);
         return false;
     }
+}
+
+function formatLunarTimestamp(dateObj) {
+    const roundedDate = new Date(dateObj);
+    roundedDate.setUTCMinutes(0, 0, 0);
+    return roundedDate.toISOString().slice(0, 16);
+}
+
+function getMoonImageUrl(data) {
+    return data?.image?.url || data?.su_image?.url || CONFIG.FALLBACK_MOON;
 }
 
 function updateLunarUI(data) {
@@ -140,7 +152,7 @@ function updateLunarUI(data) {
     }
 
     // Render Moon
-    drawMoon(data.image.url);
+    drawMoon(getMoonImageUrl(data));
 }
 
 function getPhaseName(illum, age) {
