@@ -1,10 +1,18 @@
 /* ================= MISSION CONFIG ================= */
 const CONFIG = {
     UPDATE_INTERVAL: 15 * 60 * 1000,
-    SVS_BASE_URL: "https://svs.gsfc.nasa.gov/api/dialamoon/",
     NOAA_KP_URL: "https://services.swpc.noaa.gov/products/noaa-scales.json",
-    FALLBACK_MOON: "https://upload.wikimedia.org/wikipedia/commons/e/e1/FullMoon2010.jpg",
-    LUNAR_LOOKBACK_HOURS: 6
+    FALLBACK_MOON: "assets/moon-phases/full.svg",
+    MOON_PHASE_IMAGES: {
+        new: "assets/moon-phases/new.svg",
+        waxingCrescent: "assets/moon-phases/waxing-crescent.svg",
+        firstQuarter: "assets/moon-phases/first-quarter.svg",
+        waxingGibbous: "assets/moon-phases/waxing-gibbous.svg",
+        full: "assets/moon-phases/full.svg",
+        waningGibbous: "assets/moon-phases/waning-gibbous.svg",
+        lastQuarter: "assets/moon-phases/last-quarter.svg",
+        waningCrescent: "assets/moon-phases/waning-crescent.svg"
+    }
 };
 
 /* ================= STATE ================= */
@@ -70,55 +78,17 @@ function initUI() {
 
 /* ================= DATA FETCHING ================= */
 async function updateStation() {
-    logToConsole("Syncing with NASA SVS...");
-
     const now = new Date();
     updateLunarUI(createLocalLunarData(now));
+    logToConsole("LOCAL LUNAR MODEL: OK.");
 
-    let fetched = false;
-
-    // Dial-A-Moon publishes hourly frames. Minute-level timestamps can miss and
-    // leave the station stuck on the static fallback image.
-    for (let hourOffset = 0; hourOffset <= CONFIG.LUNAR_LOOKBACK_HOURS; hourOffset++) {
-        const offsetDate = new Date(now.getTime() - hourOffset * 3600000);
-        fetched = await tryFetchLunar(offsetDate);
-        if (fetched) break;
-    }
-
-    if (!fetched) {
-        logToConsole("NASA API UNAVAILABLE. USING LOCAL LUNAR MODEL.");
-    }
-
-    fetchCamImages();
     updateSpaceWeather();
     updateClocks();
 }
 
-async function tryFetchLunar(dateObj) {
-    const ts = formatLunarTimestamp(dateObj);
-    try {
-        const response = await fetch(`${CONFIG.SVS_BASE_URL}${ts}`);
-        if (!response.ok) return false;
-        const data = await response.json();
-
-        state.lunarData = data;
-        updateLunarUI(data);
-        logToConsole(`REAL-TIME DATA SYNC: OK [${ts}]`);
-        return true;
-    } catch (err) {
-        console.warn("Fetch Error:", err);
-        return false;
-    }
-}
-
-function formatLunarTimestamp(dateObj) {
-    const roundedDate = new Date(dateObj);
-    roundedDate.setUTCMinutes(0, 0, 0);
-    return roundedDate.toISOString().slice(0, 16);
-}
-
 function getMoonImageUrl(data) {
-    return data?.image?.url || data?.su_image?.url || CONFIG.FALLBACK_MOON;
+    const phaseKey = data?.phaseKey || getPhaseKey(data?.age || 0);
+    return CONFIG.MOON_PHASE_IMAGES[phaseKey] || CONFIG.FALLBACK_MOON;
 }
 
 function normalizeLunarData(data) {
@@ -133,7 +103,8 @@ function normalizeLunarData(data) {
         age: Number.isFinite(safeData.age) ? safeData.age : fallback.age,
         subearth_lon: Number.isFinite(safeData.subearth_lon) ? safeData.subearth_lon : fallback.subearth_lon,
         subearth_lat: Number.isFinite(safeData.subearth_lat) ? safeData.subearth_lat : fallback.subearth_lat,
-        image: safeData.image || fallback.image
+        image: safeData.image || fallback.image,
+        phaseKey: safeData.phaseKey || getPhaseKey(Number.isFinite(safeData.age) ? safeData.age : fallback.age)
     };
 }
 
@@ -196,7 +167,7 @@ function drawMoon(url, data = null) {
                 drawMoon(CONFIG.FALLBACK_MOON, {
                     ...state.moonRenderData,
                     image: { url: CONFIG.FALLBACK_MOON },
-                    isFallback: true
+                    phaseKey: "full"
                 });
             }
         };
@@ -224,43 +195,9 @@ function render() {
         ctx.shadowBlur = 50;
         ctx.shadowColor = "rgba(159, 231, 255, 0.15)";
         ctx.drawImage(state.moonImg, x, y, s, s);
-        applyFallbackPhaseShadow(ctx, x, y, s);
 
         applyViewFilter(canvas);
     }
-}
-
-function applyFallbackPhaseShadow(ctx, x, y, size) {
-    const data = state.moonRenderData;
-    if (!data?.isFallback && !data?.isLocalEstimate) return;
-
-    const illum = Math.max(0, Math.min(100, data.phase)) / 100;
-    const isWaxing = data.age < 14.765;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-    ctx.clip();
-
-    const darkWidth = Math.max(0, 1 - illum) * size;
-    const darkX = isWaxing ? x : x + illum * size;
-    const terminatorX = isWaxing ? x + darkWidth : darkX;
-
-    ctx.fillStyle = "rgba(0, 0, 0, 0.88)";
-    ctx.fillRect(darkX, y, darkWidth, size);
-
-    const gradient = ctx.createLinearGradient(terminatorX - size * 0.08, y, terminatorX + size * 0.08, y);
-    if (isWaxing) {
-        gradient.addColorStop(0, "rgba(0, 0, 0, 0.32)");
-        gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-    } else {
-        gradient.addColorStop(0, "rgba(0, 0, 0, 0)");
-        gradient.addColorStop(1, "rgba(0, 0, 0, 0.32)");
-    }
-    ctx.fillStyle = gradient;
-    ctx.fillRect(x, y, size, size);
-
-    ctx.restore();
 }
 
 function applyViewFilter(canvas) {
@@ -306,14 +243,15 @@ function initStars() {
 /* ================= UTILS ================= */
 function createLocalLunarData(dateObj) {
     const estimate = calculateApproxLunarData(dateObj);
+    const phaseKey = getPhaseKey(estimate.age);
+
     return {
         distance: 384400,
         phase: estimate.phase,
         age: estimate.age,
         subearth_lon: 4.5, subearth_lat: 0.5,
-        image: { url: CONFIG.FALLBACK_MOON },
-        isFallback: true,
-        isLocalEstimate: true
+        image: { url: CONFIG.MOON_PHASE_IMAGES[phaseKey] },
+        phaseKey
     };
 }
 
@@ -325,6 +263,23 @@ function calculateApproxLunarData(dateObj) {
     const phase = (1 - Math.cos((Math.PI * 2 * age) / synodicMonth)) * 50;
 
     return { age, phase };
+}
+
+function getPhaseKey(age) {
+    const synodicMonth = 29.530588853;
+    const normalizedAge = ((age % synodicMonth) + synodicMonth) % synodicMonth;
+    const phaseIndex = Math.round((normalizedAge / synodicMonth) * 8) % 8;
+
+    return [
+        "new",
+        "waxingCrescent",
+        "firstQuarter",
+        "waxingGibbous",
+        "full",
+        "waningGibbous",
+        "lastQuarter",
+        "waningCrescent"
+    ][phaseIndex];
 }
 
 function logToConsole(msg) {
@@ -386,22 +341,6 @@ function updateGraph() {
 }
 
 /* ================= EXTRA SYNC ================= */
-async function fetchCamImages() {
-    try {
-        const res = await fetch(`https://images-api.nasa.gov/search?q=moon%20surface&media_type=image`);
-        const data = await res.json();
-        const items = data.collection.items;
-        if (items.length > 2) {
-            const getImg = (id) => {
-                const img = document.getElementById(id);
-                if (img) img.src = items[Math.floor(Math.random() * items.length)].links[0].href;
-            };
-            getImg('cam1-img');
-            getImg('cam2-img');
-        }
-    } catch (e) { }
-}
-
 async function updateSpaceWeather() {
     try {
         const res = await fetch(CONFIG.NOAA_KP_URL);
